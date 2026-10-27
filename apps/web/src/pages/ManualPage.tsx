@@ -5,7 +5,7 @@ import { explainError } from '../errors'
 import { useI18n, type CopyKey } from '../i18n'
 import { submitScan } from '../submit'
 import { SupervisorNames } from '../components/SupervisorNames'
-import { Button, Field, Panel, SelectInput, TextInput } from '../components/ui'
+import { Alert, Button, Field, PageHeader, Panel, SelectInput, TextInput } from '../components/ui'
 
 export function ManualPage() {
   const { session } = useAuth()
@@ -39,8 +39,9 @@ export function ManualPage() {
 
   return (
     <form className="grid gap-4" onSubmit={onSubmit}>
+      <PageHeader title={t('manual')} subtitle={t('tileManual')} />
       <Panel className="grid gap-3">
-        <p>{t('sop8')}</p>
+        <Alert tone="info">{t('sop8')}</Alert>
         <Field label={t('dp')}>
           <SelectInput value={dp} onChange={(event) => setDp(event.target.value)}>
             {dps.map((code) => (
@@ -58,10 +59,12 @@ export function ManualPage() {
         <Field label={t('pin')}>
           <TextInput data-testid="manual-pin" dir="ltr" inputMode="numeric" value={pin} onChange={(event) => setPin(event.target.value)} />
         </Field>
-        <Button data-testid="manual-submit" type="submit" disabled={!isHhCode(hh) || reason.trim().length < 3 || pin.length < 4}>
+        <Button data-testid="manual-submit" type="submit" size="lg" disabled={!isHhCode(hh) || reason.trim().length < 3 || pin.length < 4}>
           {t('submit')}
         </Button>
-        {message ? <p className={ok ? 'text-xl font-bold text-served' : 'text-xl font-bold text-blocked'}>{message}</p> : null}
+        {message ? (
+          <p className={`rounded-2xl px-4 py-3 text-xl font-bold ${ok ? 'bg-served/10 text-served' : 'bg-blocked/10 text-blocked'}`}>{message}</p>
+        ) : null}
       </Panel>
     </form>
   )

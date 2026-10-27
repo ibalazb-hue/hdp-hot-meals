@@ -1,18 +1,22 @@
 @import "tailwindcss";
 
 @theme {
-  --color-paper: #d5e0e2;
-  --color-canvas: #f4f7f6;
-  --color-mist: #e7eeed;
-  --color-ink: #142028;
-  --color-muted: #5c6d75;
-  --color-teal: #0c3d4a;
-  --color-lagoon: #187484;
-  --color-line: #d5e0de;
-  --color-served: #0b7a45;
-  --color-blocked: #a11d3d;
+  --color-paper: #cfd9dc;
+  --color-canvas: #f3f6f5;
+  --color-mist: #e6eded;
+  --color-ink: #0f1c24;
+  --color-muted: #5a6b73;
+  --color-teal: #0a3540;
+  --color-lagoon: #157484;
+  --color-line: #d0dcd9;
+  --color-served: #0a7340;
+  --color-blocked: #9f1a3a;
   --color-sand: #ffffff;
   --color-warn: #9a3412;
+  --color-amber: #b45309;
+  --color-sky: #0369a1;
+  --shadow-card: 0 1px 2px rgba(15, 28, 36, 0.04), 0 8px 24px rgba(15, 28, 36, 0.06);
+  --shadow-lift: 0 4px 24px rgba(10, 53, 64, 0.14);
 }
 
 html,
@@ -26,6 +30,8 @@ body {
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: "Segoe UI Variable", "Segoe UI", Tahoma, "Noto Naskh Arabic", "Noto Sans Arabic", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button,
@@ -47,7 +53,7 @@ textarea {
   min-height: 12rem;
   flex: 1;
   border: none !important;
-  background: #0c3d4a;
+  background: #0a3540;
 }
 
 #qr-reader video {
@@ -61,6 +67,10 @@ textarea {
 #qr-reader__dashboard_section,
 #qr-reader__header_message {
   display: none !important;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 @media print {

@@ -5,7 +5,7 @@ import { db, type LocalScan } from '../db'
 import { useI18n, type CopyKey } from '../i18n'
 import { readCard, submitScan } from '../submit'
 import { SupervisorNames } from '../components/SupervisorNames'
-import { Button, Field, Panel, SelectInput, TextInput } from '../components/ui'
+import { Button, Field, PageHeader, Panel, SelectInput, TextInput } from '../components/ui'
 import { explainError } from '../errors'
 
 function beep(ok: boolean) {
@@ -107,7 +107,8 @@ export function ScanPage() {
   const messageKey = (result?.messageKey ?? 'unknown') as CopyKey
 
   return (
-    <div className="relative flex h-full min-h-0 flex-1 flex-col gap-4 overflow-hidden pb-2">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col gap-3 overflow-hidden pb-2">
+      {result ? null : <PageHeader title={t('scan')} subtitle={t('tileScan')} />}
       {result ? (
         <div className="absolute inset-0 z-10 overflow-y-auto bg-canvas">
         <section

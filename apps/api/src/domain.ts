@@ -195,6 +195,15 @@ function assertDpAccess(actor: Actor, dpCode: string): void {
   if (!actor.dpCodes.includes(dpCode)) throw new HttpError(403, 'forbidden')
 }
 
+/** Admin always sees every active DP; other roles use assigned codes. */
+async function accessibleDpCodes(db: Database, actor: Actor): Promise<string[]> {
+  if (actor.role === 'admin') {
+    const rows = await db.query(`SELECT code FROM distribution_points WHERE active = TRUE ORDER BY code`)
+    return rows.map((row) => String(row.code))
+  }
+  return actor.dpCodes
+}
+
 async function matchSupervisor(tx: Queryable, pin: string): Promise<string | null> {
   const rows = await tx.query<{ id: string; pin_hash: string | null }>(
     `SELECT id, pin_hash FROM users WHERE role = 'supervisor' AND active = TRUE AND pin_hash IS NOT NULL`,
@@ -508,7 +517,7 @@ export async function getScan(db: Database, actor: Actor, id: string): Promise<S
 }
 
 export async function dashboard(db: Database, actor: Actor, scanDate: string, dpCode?: string) {
-  const dps = dpCode ? [dpCode.toUpperCase()] : actor.dpCodes
+  const dps = dpCode ? [dpCode.toUpperCase()] : await accessibleDpCodes(db, actor)
   for (const code of dps) assertDpAccess(actor, code)
   if (dps.length === 0) return { scanDate, uniqueServed: 0, blocked: 0, byReason: {}, byResult: {} }
   const clause = inClause(dps, 2)
@@ -579,7 +588,7 @@ export async function createHousehold(
 
 export async function listHouseholds(db: Database, actor: Actor, query: { q?: string; dp?: string }) {
   if (actor.role === 'dp_focal') throw new HttpError(403, 'forbidden')
-  const dps = query.dp ? [query.dp.toUpperCase()] : actor.dpCodes
+  const dps = query.dp ? [query.dp.toUpperCase()] : await accessibleDpCodes(db, actor)
   for (const code of dps) assertDpAccess(actor, code)
   if (dps.length === 0) return []
   const clause = inClause(dps, 1)
@@ -713,7 +722,8 @@ export async function upsertProduction(
 export async function reconciliation(db: Database, actor: Actor, scanDate: string) {
   if (actor.role === 'dp_focal') throw new HttpError(403, 'forbidden')
   const rows = []
-  for (const dpCode of actor.dpCodes) {
+  const codes = await accessibleDpCodes(db, actor)
+  for (const dpCode of codes) {
     const production = await db.query(
       `SELECT meals_prepared FROM daily_production WHERE dp_code = $1 AND production_date = $2`,
       [dpCode, scanDate],
@@ -767,7 +777,7 @@ function csvCell(value: unknown): string {
 
 export async function exportRegister(db: Database, actor: Actor, scanDate: string, dpCode?: string): Promise<string> {
   if (actor.role === 'dp_focal') throw new HttpError(403, 'forbidden')
-  const dps = dpCode ? [dpCode.toUpperCase()] : actor.dpCodes
+  const dps = dpCode ? [dpCode.toUpperCase()] : await accessibleDpCodes(db, actor)
   for (const code of dps) assertDpAccess(actor, code)
   const columns = [
     'scan_date',

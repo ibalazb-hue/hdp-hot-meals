@@ -30,22 +30,35 @@ export function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-paper px-4 py-8">
-      <div className="w-full max-w-md">
-        <div className="mb-4 flex items-start justify-between gap-3">
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-paper px-4 py-8">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(21,116,132,0.18),_transparent_55%),radial-gradient(ellipse_at_bottom,_rgba(10,53,64,0.12),_transparent_50%)]" />
+      <div className="relative w-full max-w-md">
+        <div className="mb-5 flex items-start justify-between gap-3">
           <div>
-            <BrandLogos className="h-14" />
-            <h1 className="mt-3 text-3xl font-bold leading-tight">{t('appName')}</h1>
-            <p className="text-sm text-muted">{t('appPlace')}</p>
+            <div className="inline-flex rounded-2xl bg-white p-3 shadow-[var(--shadow-card)]">
+              <BrandLogos className="h-12" />
+            </div>
+            <h1 className="mt-4 text-3xl font-bold leading-tight tracking-tight text-ink">{t('appName')}</h1>
+            <p className="mt-1 text-sm text-muted">{t('appPlace')}</p>
+            <p className="mt-2 text-sm font-semibold text-teal">{t('loginTagline')}</p>
           </div>
-          <button className="min-h-11 rounded-full bg-white px-4 font-bold shadow-sm" onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')}>
+          <button
+            className="min-h-11 rounded-full border border-line bg-white px-4 text-sm font-bold shadow-sm"
+            onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')}
+          >
             {locale === 'en' ? 'عربي' : 'EN'}
           </button>
         </div>
-        <Panel>
+        <Panel className="shadow-[var(--shadow-lift)]">
           <form className="grid gap-4" onSubmit={onSubmit}>
             <Field label={t('username')}>
-              <TextInput data-testid="username" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} />
+              <TextInput
+                data-testid="username"
+                autoComplete="username"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                autoFocus
+              />
             </Field>
             <Field label={t('password')}>
               <TextInput
@@ -56,12 +69,13 @@ export function LoginPage() {
                 onChange={(event) => setPassword(event.target.value)}
               />
             </Field>
-            {error ? <p className="text-blocked">{error}</p> : null}
-            <Button data-testid="login" type="submit" disabled={busy || username.length < 3 || password.length < 8}>
+            {error ? <p className="rounded-xl bg-blocked/10 px-3 py-2 text-sm font-semibold text-blocked">{error}</p> : null}
+            <Button data-testid="login" type="submit" size="lg" disabled={busy || username.length < 3 || password.length < 8}>
               {busy ? t('signingIn') : t('signIn')}
             </Button>
           </form>
         </Panel>
+        <p className="mt-4 text-center text-xs text-muted">{t('oneMeal')}</p>
       </div>
     </main>
   )

@@ -3,7 +3,7 @@ import { apiJson } from '../api'
 import { explainError } from '../errors'
 import { useAuth } from '../auth'
 import { QrCard } from '../components/QrCard'
-import { Button, Field, Panel, SelectInput, TextInput } from '../components/ui'
+import { Alert, Button, Field, PageHeader, Panel, SelectInput, TextInput } from '../components/ui'
 import { useI18n } from '../i18n'
 
 interface Issued {
@@ -51,6 +51,7 @@ export function RegisterPage() {
 
   return (
     <div className="grid gap-4">
+      <PageHeader title={t('register')} subtitle={t('tileRegister')} />
       <Panel>
         <form className="grid gap-3" onSubmit={onSubmit}>
           <Field label={t('dp')}>
@@ -68,16 +69,18 @@ export function RegisterPage() {
           <Field label={t('label')}>
             <TextInput value={label} onChange={(event) => setLabel(event.target.value)} maxLength={40} />
           </Field>
-          <Button data-testid="register-submit" type="submit">
+          <Button data-testid="register-submit" type="submit" size="lg">
             {t('register')}
           </Button>
-          {error ? <p className="text-blocked">{error}</p> : null}
+          {error ? <Alert tone="danger">{error}</Alert> : null}
         </form>
       </Panel>
       {issued ? (
         <div>
-          <p className="mb-2 font-semibold text-served">{t('registered')}</p>
-          <QrCard hhCode={issued.hhCode} payload={issued.payload} dpName={point ? `${point.nameEn} / ${point.nameAr}` : issued.dpCode} />
+          <Alert tone="ok">{t('registered')}</Alert>
+          <div className="mt-3">
+            <QrCard hhCode={issued.hhCode} payload={issued.payload} dpName={point ? `${point.nameEn} / ${point.nameAr}` : issued.dpCode} />
+          </div>
         </div>
       ) : null}
     </div>
