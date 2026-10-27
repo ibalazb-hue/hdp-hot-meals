@@ -1,0 +1,403 @@
+import { adenDate, TRAINING_PASSWORD, TRAINING_PIN } from '@hdp/rules'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { createApp } from './app.js'
+import { createDatabase, migrate, type Database } from './db.js'
+import { seed } from './seed.js'
+
+let db: Database
+let app: ReturnType<typeof createApp>
+
+beforeEach(async () => {
+  db = await createDatabase({ memory: true })
+  await migrate(db)
+  await seed(db)
+  app = createApp(db)
+})
+
+afterEach(async () => {
+  await db.close()
+})
+
+async function login(username: string) {
+  const response = await app.request('/api/auth/login', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username, password: TRAINING_PASSWORD }),
+  })
+  expect(response.status).toBe(200)
+  return (await response.json()) as { token: string; user: { id: string; role: string; dpCodes: string[] } }
+}
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}`, 'content-type': 'application/json' }
+}
+
+function scan(
+  operatorId: string,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    id: crypto.randomUUID(),
+    cardCode: 'CMDF01000101',
+    dpCode: 'MDF01',
+    scannedAt: new Date().toISOString(),
+    mode: 'card',
+    clientResult: 'Served',
+    offlineFlag: false,
+    deviceId: 'tablet-test-1',
+    operatorId,
+    ...overrides,
+  }
+}
+
+async function postScan(token: string, body: Record<string, unknown>) {
+  const response = await app.request('/api/scans', { method: 'POST', headers: auth(token), body: JSON.stringify(body) })
+  const json = (await response.json()) as { error?: string; scan?: { result: string; blockReason: string | null; countsAsDistributed: boolean; id: string }; demotedScanId?: string | null }
+  return { status: response.status, json }
+}
+
+describe('meal scans', () => {
+  it('stores the tablet location on the scan and still serves the meal', async () => {
+    const focal = await login('focal.mudhaffar')
+    const result = await postScan(
+      focal.token,
+      scan(focal.user.id, { cardCode: 'CMDF01000102', latitude: 13.57952, longitude: 44.02091, locationAccuracyM: 18 }),
+    )
+    expect(result.json.scan?.result).toBe('Served')
+    const stored = result.json.scan as { latitude?: number; longitude?: number; locationAccuracyM?: number }
+    expect(stored.latitude).toBeCloseTo(13.57952)
+    expect(stored.longitude).toBeCloseTo(44.02091)
+    expect(stored.locationAccuracyM).toBe(18)
+  })
+
+  it('serves once per household per Aden day and blocks the second scan', async () => {
+    const focal = await login('focal.mudhaffar')
+    const first = await postScan(focal.token, scan(focal.user.id))
+    expect(first.status).toBe(200)
+    expect(first.json.scan?.result).toBe('Served')
+
+    const second = await postScan(
+      focal.token,
+      scan(focal.user.id, { scannedAt: new Date(Date.now() + 5_000).toISOString(), deviceId: 'tablet-test-2' }),
+    )
+    expect(second.json.scan?.blockReason).toBe('already_served')
+    expect(second.json.scan?.countsAsDistributed).toBe(false)
+
+    const date = adenDate()
+    const dashboard = await app.request(`/api/dashboard?date=${date}&dp=MDF01`, { headers: auth(focal.token) })
+    const counts = (await dashboard.json()) as { uniqueServed: number }
+    expect(counts.uniqueServed).toBe(1)
+  })
+
+  it('never serves a voided card, including when a supervisor PIN is offered', async () => {
+    const focal = await login('focal.mudhaffar')
+    const result = await postScan(
+      focal.token,
+      scan(focal.user.id, {
+        cardCode: 'CMDF01000103',
+        overrideReason: 'They are here',
+        supervisorPin: TRAINING_PIN,
+      }),
+    )
+    expect(result.json.scan?.blockReason).toBe('voided')
+    expect(result.json.scan?.countsAsDistributed).toBe(false)
+  })
+
+  it('blocks the wrong distribution point and allows a supervisor override', async () => {
+    const focal = await login('focal.mudhaffar')
+    const blocked = await postScan(focal.token, scan(focal.user.id, { cardCode: 'CQAH01000201' }))
+    expect(blocked.json.scan?.blockReason).toBe('wrong_dp')
+
+    const override = await postScan(
+      focal.token,
+      scan(focal.user.id, {
+        cardCode: 'CQAH01000201',
+        clientResult: 'Override',
+        overrideReason: 'Kitchen at Qahira closed',
+        supervisorPin: TRAINING_PIN,
+      }),
+    )
+    expect(override.json.scan?.result).toBe('Override')
+    expect(override.json.scan?.countsAsDistributed).toBe(true)
+  })
+
+  it('keeps the earlier offline Served when the later scan syncs first', async () => {
+    const focal = await login('focal.mudhaffar')
+    // Keep both device times on the same Asia/Aden calendar day (relative offsets fail near midnight).
+    const today = adenDate()
+    const dayStart = new Date(`${today}T00:00:00+03:00`).getTime()
+    const dayEnd = new Date(`${today}T23:59:50+03:00`).getTime()
+    const now = Date.now()
+    let laterMs = Math.min(now - 5 * 60_000, dayEnd)
+    let earlierMs = laterMs - 30 * 60_000
+    if (earlierMs < dayStart) {
+      earlierMs = dayStart + 60_000
+      laterMs = earlierMs + 10 * 60_000
+    }
+    const later = scan(focal.user.id, {
+      scannedAt: new Date(laterMs).toISOString(),
+      deviceId: 'tablet-a',
+      offlineFlag: true,
+    })
+    const earlier = scan(focal.user.id, {
+      scannedAt: new Date(earlierMs).toISOString(),
+      deviceId: 'tablet-b',
+      offlineFlag: true,
+    })
+    const first = await postScan(focal.token, later)
+    expect(first.json.scan?.result).toBe('Served')
+    const second = await postScan(focal.token, earlier)
+    expect(second.json.scan?.result).toBe('Served')
+    expect(second.json.demotedScanId).toBe(later.id)
+
+    const demoted = await app.request(`/api/scans/${later.id}`, { headers: auth(focal.token) })
+    const demotedBody = (await demoted.json()) as { result: string; blockReason: string; countsAsDistributed: boolean }
+    expect(demotedBody.result).toBe('Blocked')
+    expect(demotedBody.blockReason).toBe('duplicate_conflict')
+    expect(demotedBody.countsAsDistributed).toBe(false)
+
+    const date = adenDate(earlier.scannedAt as string)
+    const dashboard = await app.request(`/api/dashboard?date=${date}&dp=MDF01`, { headers: auth(focal.token) })
+    expect(((await dashboard.json()) as { uniqueServed: number }).uniqueServed).toBe(1)
+  })
+
+  it('voids the old card on reissue and serves only the new card', async () => {
+    const meal = await login('meal.taiz')
+    const focal = await login('focal.mudhaffar')
+    const reissue = await app.request('/api/households/TZ-MDF01-000102/reissue', {
+      method: 'POST',
+      headers: auth(meal.token),
+      body: JSON.stringify({ reason: 'Lost card at the gate' }),
+    })
+    expect(reissue.status).toBe(200)
+    const issued = (await reissue.json()) as { cardCode: string; previousCardCode: string; hhCode: string }
+    expect(issued.previousCardCode).toBe('CMDF01000102')
+    expect(issued.hhCode).toBe('TZ-MDF01-000102')
+
+    const oldCard = await postScan(focal.token, scan(focal.user.id, { cardCode: 'CMDF01000102' }))
+    expect(oldCard.json.scan?.blockReason).toBe('voided')
+
+    const newCard = await postScan(focal.token, scan(focal.user.id, { cardCode: issued.cardCode }))
+    expect(newCard.json.scan?.result).toBe('Served')
+    const repeat = await postScan(focal.token, scan(focal.user.id, { cardCode: issued.cardCode }))
+    expect(repeat.json.scan?.blockReason).toBe('already_served')
+  })
+
+  it('records a manual household code with the supervisor PIN', async () => {
+    const focal = await login('focal.mudhaffar')
+    const result = await postScan(
+      focal.token,
+      scan(focal.user.id, {
+        mode: 'manual',
+        cardCode: null,
+        hhCode: 'TZ-MDF01-000101',
+        clientResult: 'ManualException',
+        overrideReason: 'Camera lens cracked',
+        supervisorPin: TRAINING_PIN,
+      }),
+    )
+    expect(result.json.scan?.result).toBe('ManualException')
+    expect(result.json.scan?.countsAsDistributed).toBe(true)
+  })
+
+  it('exports a WFP register without biometrics and alerts reconciliation over 1%', async () => {
+    const focal = await login('focal.mudhaffar')
+    const meal = await login('meal.taiz')
+    await postScan(focal.token, scan(focal.user.id, { offlineFlag: true }))
+    const date = adenDate()
+    const csvResponse = await app.request(`/api/export/register.csv?date=${date}&dp=MDF01`, { headers: auth(meal.token) })
+    const csv = await csvResponse.text()
+    expect(csv).toContain('hh_code')
+    expect(csv).toContain('TZ-MDF01-000101')
+    expect(csv.toLowerCase()).not.toContain('fingerprint')
+    expect(csv).not.toContain('biometric')
+    expect(csv).not.toContain('supervisor_id')
+    expect(csv).not.toContain('supervisor.taiz')
+
+    const tight = await app.request('/api/production', {
+      method: 'POST',
+      headers: auth(meal.token),
+      body: JSON.stringify({ dpCode: 'MDF01', productionDate: date, mealsPrepared: 1 }),
+    })
+    expect(tight.status).toBe(200)
+    const ok = await app.request(`/api/reconciliation?date=${date}`, { headers: auth(meal.token) })
+    const okBody = (await ok.json()) as { rows: Array<{ dpCode: string; alert: boolean; uniqueServed: number }> }
+    expect(okBody.rows.find((row) => row.dpCode === 'MDF01')).toMatchObject({ uniqueServed: 1, alert: false })
+
+    await app.request('/api/production', {
+      method: 'POST',
+      headers: auth(meal.token),
+      body: JSON.stringify({ dpCode: 'MDF01', productionDate: date, mealsPrepared: 100 }),
+    })
+    const wide = await app.request(`/api/reconciliation?date=${date}`, { headers: auth(meal.token) })
+    const wideBody = (await wide.json()) as { rows: Array<{ dpCode: string; alert: boolean; reason: string }> }
+    expect(wideBody.rows.find((row) => row.dpCode === 'MDF01')?.alert).toBe(true)
+  })
+})
+
+describe('admin users', () => {
+  it('lets an admin edit a user and delete one who has no audit record', async () => {
+    const admin = await login('admin.taiz')
+    const created = await app.request('/api/admin/users', {
+      method: 'POST',
+      headers: auth(admin.token),
+      body: JSON.stringify({
+        username: 'focal.new',
+        displayName: 'New focal',
+        password: 'Train-Hdp-2026',
+        role: 'dp_focal',
+        dpCodes: ['MDF01'],
+      }),
+    })
+    expect(created.status).toBe(201)
+    const { id } = (await created.json()) as { id: string }
+
+    const edited = await app.request(`/api/admin/users/${id}`, {
+      method: 'PATCH',
+      headers: auth(admin.token),
+      body: JSON.stringify({ displayName: 'Renamed focal', dpCodes: ['MDF02'] }),
+    })
+    expect(edited.status).toBe(200)
+
+    const list = await app.request('/api/admin/users', { headers: auth(admin.token) })
+    const users = (await list.json()) as Array<{ id: string; displayName: string; dpCodes: string[] }>
+    expect(users.find((user) => user.id === id)).toMatchObject({ displayName: 'Renamed focal', dpCodes: ['MDF02'] })
+
+    const removed = await app.request(`/api/admin/users/${id}`, { method: 'DELETE', headers: auth(admin.token) })
+    expect(removed.status).toBe(200)
+
+    const self = await app.request(`/api/admin/users/${admin.user.id}`, { method: 'DELETE', headers: auth(admin.token) })
+    expect(self.status).toBe(400)
+
+    const meal = await login('meal.taiz')
+    const kept = await app.request(`/api/admin/users/${meal.user.id}`, { method: 'DELETE', headers: auth(admin.token) })
+    expect(kept.status).toBe(409)
+  })
+
+  it('gives the supervisor code and name only to the focal point', async () => {
+    const admin = await login('admin.taiz')
+    const list = await app.request('/api/admin/users', { headers: auth(admin.token) })
+    const users = (await list.json()) as Array<{ username: string; displayName: string; role: string }>
+    const supervisor = users.find((user) => user.role === 'supervisor')
+    expect(supervisor).toMatchObject({ username: '', displayName: '' })
+    expect(JSON.stringify(users)).not.toContain('supervisor.taiz')
+    expect(JSON.stringify(users)).not.toContain('Taiz supervisor')
+
+    for (const username of ['meal.taiz', 'supervisor.taiz', 'admin.taiz']) {
+      const actor = await login(username)
+      const bundle = await app.request('/api/sync/bundle', { headers: auth(actor.token) })
+      const body = (await bundle.json()) as { supervisorPins: unknown[] }
+      expect(body.supervisorPins).toEqual([])
+    }
+
+    const focal = await login('focal.mudhaffar')
+    const focalBundle = await app.request('/api/sync/bundle', { headers: auth(focal.token) })
+    const focalBody = (await focalBundle.json()) as {
+      supervisorPins: Array<{ username: string; displayName: string; pinHash: string }>
+    }
+    expect(focalBody.supervisorPins[0]?.username).toBe('supervisor.taiz')
+    expect(focalBody.supervisorPins[0]?.displayName).toBe('Taiz supervisor')
+    expect(focalBody.supervisorPins[0]?.pinHash).toBeTruthy()
+  })
+})
+
+describe('admin distribution points', () => {
+  it('creates and updates a point, and refuses a code change without dropping households', async () => {
+    const admin = await login('admin.taiz')
+    const created = await app.request('/api/admin/dps', {
+      method: 'POST',
+      headers: auth(admin.token),
+      body: JSON.stringify({
+        code: 'mdf06',
+        nameEn: 'Sample site',
+        nameAr: 'موقع تجريبي',
+        district: 'Al-Mudhaffar',
+        active: true,
+      }),
+    })
+    expect(created.status).toBe(201)
+    expect(await created.json()).toMatchObject({
+      code: 'MDF06',
+      nameEn: 'Sample site',
+      nameAr: 'موقع تجريبي',
+      district: 'Al-Mudhaffar',
+      active: true,
+    })
+
+    const duplicate = await app.request('/api/admin/dps', {
+      method: 'POST',
+      headers: auth(admin.token),
+      body: JSON.stringify({
+        code: 'MDF06',
+        nameEn: 'Again',
+        nameAr: 'مرة أخرى',
+        district: 'Al-Qahira',
+      }),
+    })
+    expect(duplicate.status).toBe(409)
+    expect(await duplicate.json()).toEqual({ error: 'dp_code_taken' })
+
+    const bad = await app.request('/api/admin/dps', {
+      method: 'POST',
+      headers: auth(admin.token),
+      body: JSON.stringify({
+        code: 'MD F',
+        nameEn: 'Bad code',
+        nameAr: 'رمز سيئ',
+        district: 'Al-Mudhaffar',
+      }),
+    })
+    expect(bad.status).toBe(400)
+    expect(await bad.json()).toEqual({ error: 'invalid_dp_code' })
+
+    const before = await app.request('/api/households?dp=MDF01', { headers: auth(admin.token) })
+    const households = (await before.json()) as Array<{ hhCode: string; activeCardCode: string | null }>
+    expect(households.map((row) => row.hhCode)).toContain('TZ-MDF01-000101')
+
+    const edited = await app.request('/api/admin/dps/mdf01', {
+      method: 'PATCH',
+      headers: auth(admin.token),
+      body: JSON.stringify({
+        nameEn: 'Mudhaffar renamed',
+        nameAr: 'المظفر بعد التعديل',
+        district: 'Al-Mudhaffar',
+        active: false,
+      }),
+    })
+    expect(edited.status).toBe(200)
+    expect(await edited.json()).toMatchObject({
+      code: 'MDF01',
+      nameEn: 'Mudhaffar renamed',
+      nameAr: 'المظفر بعد التعديل',
+      district: 'Al-Mudhaffar',
+      active: false,
+    })
+
+    const refused = await app.request('/api/admin/dps/MDF01', {
+      method: 'PATCH',
+      headers: auth(admin.token),
+      body: JSON.stringify({ code: 'MDF99', nameEn: 'Should not apply' }),
+    })
+    expect(refused.status).toBe(409)
+    expect(await refused.json()).toEqual({ error: 'dp_code_immutable' })
+
+    const after = await app.request('/api/households?dp=MDF01', { headers: auth(admin.token) })
+    const still = (await after.json()) as Array<{ hhCode: string; activeCardCode: string | null }>
+    expect(still).toEqual(households)
+    expect(still.find((row) => row.hhCode === 'TZ-MDF01-000101')?.activeCardCode).toBe('CMDF01000101')
+
+    const users = await app.request('/api/admin/users', { headers: auth(admin.token) })
+    const rows = (await users.json()) as Array<{ username: string; dpCodes: string[] }>
+    expect(rows.find((row) => row.username === 'focal.mudhaffar')?.dpCodes).toEqual(['MDF01', 'MDF02'])
+
+    const list = await app.request('/api/admin/dps', { headers: auth(admin.token) })
+    const points = (await list.json()) as Array<{ code: string; nameEn: string; nameAr: string; active: boolean }>
+    expect(points.find((row) => row.code === 'MDF01')).toMatchObject({
+      nameEn: 'Mudhaffar renamed',
+      nameAr: 'المظفر بعد التعديل',
+      active: false,
+    })
+    expect(points.find((row) => row.code === 'MDF06')?.nameEn).toBe('Sample site')
+    expect(points.some((row) => row.code === 'MDF99')).toBe(false)
+  })
+})

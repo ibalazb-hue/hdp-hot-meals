@@ -1,0 +1,15 @@
+# Optional real PostgreSQL. The API uses this when DATABASE_URL is set.
+# Default local run uses a PostgreSQL-compatible file database and the same SQL migrations.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: hdp
+      POSTGRES_PASSWORD: hdp
+      POSTGRES_DB: hdp
+    ports:
+      - "5432:5432"
+    volumes:
+      - hdp_pg:/var/lib/postgresql/data
+volumes:
+  hdp_pg:

@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #d5e0e2;
+  --color-canvas: #f4f7f6;
+  --color-mist: #e7eeed;
+  --color-ink: #142028;
+  --color-muted: #5c6d75;
+  --color-teal: #0c3d4a;
+  --color-lagoon: #187484;
+  --color-line: #d5e0de;
+  --color-served: #0b7a45;
+  --color-blocked: #a11d3d;
+  --color-sand: #ffffff;
+  --color-warn: #9a3412;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: "Segoe UI Variable", "Segoe UI", Tahoma, "Noto Naskh Arabic", "Noto Sans Arabic", sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  outline-color: var(--color-lagoon);
+}
+
+#qr-reader {
+  min-height: 12rem;
+  flex: 1;
+  border: none !important;
+  background: #0c3d4a;
+}
+
+#qr-reader video {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 12rem;
+  object-fit: cover;
+  border-radius: 0;
+}
+
+#qr-reader__dashboard_section,
+#qr-reader__header_message {
+  display: none !important;
+}
+
+@media print {
+  body {
+    background: white;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

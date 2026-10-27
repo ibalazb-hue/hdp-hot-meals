@@ -1,0 +1,22 @@
+{
+  "name": "hdp-meal-verify",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev -w @hdp/api\" \"npm run dev -w @hdp/web\"",
+    "build": "npm run build -w @hdp/web",
+    "start": "npm run build -w @hdp/web && npm run start -w @hdp/api",
+    "test": "npm run test -w @hdp/rules && npm run test -w @hdp/api",
+    "icons": "node scripts/make-icons.mjs",
+    "postinstall": "node scripts/fix-bins.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

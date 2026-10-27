@@ -1,0 +1,269 @@
+import { existsSync } from 'node:fs'
+import { Hono } from 'hono'
+import { cors } from 'hono/cors'
+import { serveStatic } from '@hono/node-server/serve-static'
+import { z } from 'zod'
+import { adenDate, ROLES } from '@hdp/rules'
+import { readSubject, signToken } from './auth.js'
+import type { Database } from './db.js'
+import {
+  applyScans,
+  createDp,
+  createHousehold,
+  createSpotCheck,
+  createUser,
+  dashboard,
+  exportRegister,
+  getHousehold,
+  getScan,
+  HttpError,
+  listDevices,
+  listDps,
+  listHouseholds,
+  listUsers,
+  loadActor,
+  login,
+  patchDp,
+  deleteUser,
+  updateUser,
+  reconciliation,
+  reissueCard,
+  syncBundle,
+  upsertProduction,
+  voidCard,
+  type Actor,
+  type IncomingScan,
+} from './domain.js'
+
+const uuid = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+
+const scanSchema = z.object({
+  id: uuid,
+  cardCode: z.string().trim().min(4).max(40).nullish(),
+  hhCode: z.string().trim().min(8).max(24).nullish(),
+  dpCode: z.string().trim().min(2).max(8),
+  scannedAt: z.string().min(10),
+  mode: z.enum(['card', 'manual']),
+  clientResult: z.enum(['Served', 'Blocked', 'Override', 'ManualException']),
+  clientBlockReason: z.string().max(40).nullish(),
+  overrideReason: z.string().max(300).nullish(),
+  supervisorPin: z.string().min(4).max(8).nullish(),
+  offlineFlag: z.boolean().optional(),
+  deviceId: z.string().trim().min(4).max(80),
+  deviceLabel: z.string().trim().max(120).nullish(),
+  operatorId: uuid,
+  latitude: z.number().gte(-90).lte(90).nullish(),
+  longitude: z.number().gte(-180).lte(180).nullish(),
+  locationAccuracyM: z.number().gte(0).lte(100000).nullish(),
+})
+
+function parse<T>(schema: z.ZodType<T>, value: unknown): T {
+  const parsed = schema.safeParse(value)
+  if (!parsed.success) throw new HttpError(400, 'invalid_body')
+  return parsed.data
+}
+
+export function createApp(db: Database, options?: { distDir?: string }) {
+  const app = new Hono<{ Variables: { actor: Actor } }>()
+  app.use('*', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type'] }))
+  app.onError((error, c) => {
+    if (error instanceof HttpError) {
+      return c.json({ error: error.code }, error.status as 400)
+    }
+    console.error(error)
+    return c.json({ error: 'server_error' }, 500)
+  })
+
+  app.get('/api/health', (c) => c.json({ ok: true, service: 'hdp-meal-verify', timeZone: 'Asia/Aden' }))
+
+  app.post('/api/auth/login', async (c) => {
+    const body = parse(
+      z.object({ username: z.string().min(3).max(32), password: z.string().min(8).max(80) }),
+      await c.req.json(),
+    )
+    const actor = await login(db, body.username, body.password)
+    const token = await signToken(actor)
+    return c.json({ ...token, user: actor })
+  })
+
+  app.use('/api/*', async (c, next) => {
+    if (c.req.path === '/api/health' || c.req.path === '/api/auth/login') return next()
+    const header = c.req.header('authorization') ?? ''
+    const token = header.startsWith('Bearer ') ? header.slice(7) : ''
+    if (!token) throw new HttpError(401, 'unauthorized')
+    const actor = await loadActor(db, await readSubject(token))
+    if (!actor) throw new HttpError(401, 'unauthorized')
+    c.set('actor', actor)
+    await next()
+  })
+
+  app.get('/api/auth/me', (c) => c.json({ user: c.get('actor') }))
+  app.get('/api/dps', async (c) => {
+    const actor = c.get('actor')
+    const rows = await listDps(db)
+    return c.json(actor.role === 'admin' ? rows : rows.filter((dp) => actor.dpCodes.includes(dp.code)))
+  })
+  app.get('/api/sync/bundle', async (c) => c.json(await syncBundle(db, c.get('actor'))))
+
+  app.post('/api/scans', async (c) => {
+    const scan = parse(scanSchema, await c.req.json()) as IncomingScan
+    const [result] = await applyScans(db, c.get('actor'), [scan])
+    if (!result?.ok) return c.json({ error: result?.error ?? 'rejected' }, 400)
+    return c.json(result)
+  })
+
+  app.post('/api/sync/scans', async (c) => {
+    const body = parse(z.object({ scans: z.array(scanSchema).min(1).max(200) }), await c.req.json())
+    return c.json({ results: await applyScans(db, c.get('actor'), body.scans as IncomingScan[]) })
+  })
+
+  app.get('/api/scans/:id', async (c) => c.json(await getScan(db, c.get('actor'), c.req.param('id'))))
+  app.get('/api/dashboard', async (c) => {
+    const date = c.req.query('date') ?? adenDate()
+    if (!day.safeParse(date).success) throw new HttpError(400, 'invalid_body')
+    return c.json(await dashboard(db, c.get('actor'), date, c.req.query('dp') || undefined))
+  })
+
+  app.get('/api/households', async (c) =>
+    c.json(await listHouseholds(db, c.get('actor'), { q: c.req.query('q'), dp: c.req.query('dp') })),
+  )
+  app.post('/api/households', async (c) => {
+    const body = parse(
+      z.object({
+        dpCode: z.string().min(2).max(8),
+        beneficiaryCount: z.number().int().min(1).max(30),
+        label: z.string().max(40).nullish(),
+      }),
+      await c.req.json(),
+    )
+    return c.json(await createHousehold(db, c.get('actor'), body), 201)
+  })
+  app.get('/api/households/:hhCode', async (c) => c.json(await getHousehold(db, c.get('actor'), c.req.param('hhCode'))))
+  app.post('/api/households/:hhCode/void', async (c) => {
+    const body = parse(z.object({ reason: z.string().min(3).max(300) }), await c.req.json())
+    return c.json(await voidCard(db, c.get('actor'), c.req.param('hhCode'), body.reason))
+  })
+  app.post('/api/households/:hhCode/reissue', async (c) => {
+    const body = parse(z.object({ reason: z.string().min(3).max(300) }), await c.req.json())
+    return c.json(await reissueCard(db, c.get('actor'), c.req.param('hhCode'), body.reason))
+  })
+
+  app.post('/api/production', async (c) => {
+    const body = parse(
+      z.object({
+        dpCode: z.string().min(2).max(8),
+        productionDate: day,
+        mealsPrepared: z.number().int().min(0).max(20000),
+        notes: z.string().max(200).nullish(),
+      }),
+      await c.req.json(),
+    )
+    return c.json(await upsertProduction(db, c.get('actor'), body))
+  })
+  app.get('/api/reconciliation', async (c) => {
+    const date = c.req.query('date') ?? adenDate()
+    if (!day.safeParse(date).success) throw new HttpError(400, 'invalid_body')
+    return c.json(await reconciliation(db, c.get('actor'), date))
+  })
+  app.post('/api/spot-checks', async (c) => {
+    const body = parse(
+      z.object({
+        dpCode: z.string().min(2).max(8),
+        hhCode: z.string().max(24).nullish(),
+        finding: z.string().min(3).max(80),
+        notes: z.string().max(200).nullish(),
+      }),
+      await c.req.json(),
+    )
+    return c.json(await createSpotCheck(db, c.get('actor'), body), 201)
+  })
+  app.get('/api/export/register.csv', async (c) => {
+    const date = c.req.query('date') ?? adenDate()
+    if (!day.safeParse(date).success) throw new HttpError(400, 'invalid_body')
+    const csv = await exportRegister(db, c.get('actor'), date, c.req.query('dp') || undefined)
+    return new Response(csv, {
+      headers: {
+        'content-type': 'text/csv; charset=utf-8',
+        'content-disposition': `attachment; filename="hdp-register-${date}.csv"`,
+      },
+    })
+  })
+
+  app.use('/api/admin/*', async (c, next) => {
+    if (c.get('actor').role !== 'admin') throw new HttpError(403, 'forbidden')
+    await next()
+  })
+  app.get('/api/admin/dps', async (c) => c.json(await listDps(db)))
+  app.post('/api/admin/dps', async (c) => {
+    const body = parse(
+      z.object({
+        code: z.string().trim().min(1).max(16),
+        nameEn: z.string().trim().min(2).max(80),
+        nameAr: z.string().trim().min(2).max(80),
+        district: z.enum(['Al-Mudhaffar', 'Al-Qahira']),
+        active: z.boolean().optional(),
+      }),
+      await c.req.json(),
+    )
+    return c.json(await createDp(db, body), 201)
+  })
+  app.patch('/api/admin/dps/:code', async (c) => {
+    const body = parse(
+      z.object({
+        code: z.string().trim().min(1).max(16).optional(),
+        active: z.boolean().optional(),
+        nameEn: z.string().trim().min(2).max(80).optional(),
+        nameAr: z.string().trim().min(2).max(80).optional(),
+        district: z.enum(['Al-Mudhaffar', 'Al-Qahira']).optional(),
+      }),
+      await c.req.json(),
+    )
+    return c.json(await patchDp(db, c.req.param('code'), body))
+  })
+  app.get('/api/admin/users', async (c) => c.json(await listUsers(db)))
+  app.post('/api/admin/users', async (c) => {
+    const body = parse(
+      z.object({
+        username: z.string().regex(/^[a-z0-9._-]{3,32}$/),
+        displayName: z.string().min(2).max(80),
+        password: z.string().min(8).max(80),
+        role: z.enum(ROLES),
+        dpCodes: z.array(z.string().min(2).max(8)).max(30),
+        pin: z.string().regex(/^\d{4,8}$/).nullish(),
+      }),
+      await c.req.json(),
+    )
+    return c.json(await createUser(db, body), 201)
+  })
+  app.patch('/api/admin/users/:id', async (c) => {
+    const body = parse(
+      z.object({
+        displayName: z.string().min(2).max(80).optional(),
+        username: z.string().regex(/^[a-z0-9._-]{3,32}$/).optional(),
+        role: z.enum(ROLES).optional(),
+        password: z.string().min(8).max(80).optional(),
+        pin: z.string().regex(/^\d{4,8}$/).nullish(),
+        dpCodes: z.array(z.string().min(2).max(8)).max(30).optional(),
+        active: z.boolean().optional(),
+      }),
+      await c.req.json(),
+    )
+    return c.json(await updateUser(db, c.req.param('id'), body))
+  })
+  app.delete('/api/admin/users/:id', async (c) => {
+    return c.json(await deleteUser(db, c.get('actor').id, c.req.param('id')))
+  })
+  app.get('/api/admin/devices', async (c) => c.json(await listDevices(db)))
+
+  app.all('/api/*', () => {
+    throw new HttpError(404, 'not_found')
+  })
+
+  if (options?.distDir && existsSync(options.distDir)) {
+    app.use('/*', serveStatic({ root: options.distDir }))
+    app.get('*', serveStatic({ root: options.distDir, path: 'index.html' }))
+  }
+
+  return app
+}

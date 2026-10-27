@@ -1,0 +1,389 @@
+openapi: 3.1.0
+info:
+  title: HDP Taiz meal verification
+  version: 1.0.0
+  summary: Offline-capable entitlement checks for one hot meal per household per Asia/Aden day.
+  description: |
+    WFP cooperating-partnership register for Al-Mudhaffar and Al-Qahira.
+    Counting results are Served, Override, and ManualException. Blocked scans are kept for audit and do not count.
+    There is no biometric endpoint. The daily register CSV is the WFP export.
+servers:
+  - url: /
+tags:
+  - name: Auth
+  - name: Sync
+  - name: Scans
+  - name: Households
+  - name: Reports
+  - name: Admin
+paths:
+  /api/health:
+    get:
+      tags: [Auth]
+      responses:
+        '200':
+          description: Service is up
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          description: JWT and profile
+        '401':
+          description: invalid_login
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Current user
+  /api/dps:
+    get:
+      tags: [Sync]
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Distribution points visible to the user
+  /api/sync/bundle:
+    get:
+      tags: [Sync]
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Households, voided cards, today's counting scans, and supervisor PIN verifiers for offline use
+  /api/scans:
+    post:
+      tags: [Scans]
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Scan' }
+      responses:
+        '200':
+          description: Authoritative scan, including a block
+        '400':
+          description: bad_pin, reason_required, clock_skew, or operator_mismatch
+  /api/sync/scans:
+    post:
+      tags: [Sync]
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scans]
+              properties:
+                scans:
+                  type: array
+                  items: { $ref: '#/components/schemas/Scan' }
+      responses:
+        '200':
+          description: Per-scan accepted or rejected results. Earlier scannedAt wins a same-day conflict.
+  /api/scans/{id}:
+    get:
+      tags: [Scans]
+      security: [{ bearer: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Stored scan
+  /api/dashboard:
+    get:
+      tags: [Reports]
+      security: [{ bearer: [] }]
+      parameters:
+        - in: query
+          name: date
+          schema: { type: string, example: '2026-10-27' }
+        - in: query
+          name: dp
+          schema: { type: string }
+      responses:
+        '200':
+          description: Unique counting scans and block reasons
+  /api/households:
+    get:
+      tags: [Households]
+      security: [{ bearer: [] }]
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: dp
+          schema: { type: string }
+      responses:
+        '200':
+          description: Household search
+    post:
+      tags: [Households]
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dpCode, beneficiaryCount]
+              properties:
+                dpCode: { type: string }
+                beneficiaryCount: { type: integer, minimum: 1, maximum: 30 }
+                label: { type: string }
+      responses:
+        '201':
+          description: Household and new card payload
+  /api/households/{hhCode}:
+    get:
+      tags: [Households]
+      security: [{ bearer: [] }]
+      parameters:
+        - in: path
+          name: hhCode
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Household, active card, and issuance history
+  /api/households/{hhCode}/void:
+    post:
+      tags: [Households]
+      security: [{ bearer: [] }]
+      parameters:
+        - in: path
+          name: hhCode
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string }
+      responses:
+        '200':
+          description: Active card voided
+  /api/households/{hhCode}/reissue:
+    post:
+      tags: [Households]
+      security: [{ bearer: [] }]
+      parameters:
+        - in: path
+          name: hhCode
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string }
+      responses:
+        '200':
+          description: Old card voided and a new card issued
+  /api/production:
+    post:
+      tags: [Reports]
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dpCode, productionDate, mealsPrepared]
+              properties:
+                dpCode: { type: string }
+                productionDate: { type: string }
+                mealsPrepared: { type: integer }
+                notes: { type: string }
+      responses:
+        '200':
+          description: Meals prepared saved
+  /api/reconciliation:
+    get:
+      tags: [Reports]
+      security: [{ bearer: [] }]
+      parameters:
+        - in: query
+          name: date
+          schema: { type: string }
+      responses:
+        '200':
+          description: Prepared versus unique counting scans, with an alert above 1% variance
+  /api/spot-checks:
+    post:
+      tags: [Reports]
+      security: [{ bearer: [] }]
+      responses:
+        '201':
+          description: Spot check recorded
+  /api/export/register.csv:
+    get:
+      tags: [Reports]
+      security: [{ bearer: [] }]
+      parameters:
+        - in: query
+          name: date
+          schema: { type: string }
+        - in: query
+          name: dp
+          schema: { type: string }
+      responses:
+        '200':
+          description: UTF-8 CSV daily register
+          content:
+            text/csv:
+              schema: { type: string }
+  /api/admin/dps:
+    get:
+      tags: [Admin]
+      security: [{ bearer: [] }]
+      responses:
+        '200': { description: All distribution points, including inactive ones }
+    post:
+      tags: [Admin]
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, nameEn, nameAr, district]
+              properties:
+                code:
+                  type: string
+                  minLength: 2
+                  maxLength: 8
+                  pattern: '^[A-Za-z0-9]{2,8}$'
+                  description: Stored uppercase. This code is the stable id and cannot be changed later.
+                nameEn: { type: string, minLength: 2, maxLength: 80 }
+                nameAr: { type: string, minLength: 2, maxLength: 80 }
+                district: { type: string, enum: [Al-Mudhaffar, Al-Qahira] }
+                active: { type: boolean, default: true }
+      responses:
+        '201': { description: Distribution point created, with a household counter starting at zero }
+        '400': { description: The code must be 2 to 8 letters or digits }
+        '409': { description: That distribution point code is already used }
+  /api/admin/dps/{code}:
+    patch:
+      tags: [Admin]
+      security: [{ bearer: [] }]
+      parameters:
+        - in: path
+          name: code
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: Refused when it differs from the path. The code stays immutable so households, cards, scans, and assignments are not retargeted.
+                nameEn: { type: string, minLength: 2, maxLength: 80 }
+                nameAr: { type: string, minLength: 2, maxLength: 80 }
+                district: { type: string, enum: [Al-Mudhaffar, Al-Qahira] }
+                active:
+                  type: boolean
+                  description: Setting this false keeps households, cards, scans, and user assignments.
+      responses:
+        '200': { description: English name, Arabic name, district, or active flag updated. History is kept. }
+        '404': { description: Unknown distribution point }
+        '409': { description: The distribution point code cannot be changed after it is created }
+  /api/admin/users:
+    get:
+      tags: [Admin]
+      security: [{ bearer: [] }]
+      responses:
+        '200': { description: Users without password hashes }
+    post:
+      tags: [Admin]
+      security: [{ bearer: [] }]
+      responses:
+        '201': { description: User created }
+  /api/admin/users/{id}:
+    patch:
+      tags: [Admin]
+      security: [{ bearer: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: User name, role, password, points, or active flag updated }
+    delete:
+      tags: [Admin]
+      security: [{ bearer: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: User removed. Refused when the user is on the meal audit record }
+  /api/admin/devices:
+    get:
+      tags: [Admin]
+      security: [{ bearer: [] }]
+      responses:
+        '200': { description: Tablets that have synced }
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Scan:
+      type: object
+      required: [id, dpCode, scannedAt, mode, clientResult, deviceId, operatorId]
+      properties:
+        id: { type: string, format: uuid }
+        cardCode: { type: string }
+        hhCode: { type: string, example: TZ-MDF01-000101 }
+        dpCode: { type: string, example: MDF01 }
+        scannedAt: { type: string, format: date-time }
+        mode: { type: string, enum: [card, manual] }
+        clientResult: { type: string, enum: [Served, Blocked, Override, ManualException] }
+        clientBlockReason:
+          type: string
+          enum: [already_served, voided, wrong_dp, unknown, inactive, no_card, duplicate_conflict]
+        overrideReason: { type: string }
+        supervisorPin: { type: string }
+        offlineFlag: { type: boolean }
+        deviceId: { type: string }
+        deviceLabel: { type: string }
+        operatorId: { type: string, format: uuid }
+        latitude: { type: number, minimum: -90, maximum: 90, description: Tablet latitude at scan time. Omitted when no GPS fix. }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+        locationAccuracyM: { type: number, description: GPS accuracy in meters. }
