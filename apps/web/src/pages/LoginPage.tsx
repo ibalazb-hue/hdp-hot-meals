@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
-import { TRAINING_PASSWORD } from '@hdp/rules'
 import { ApiError } from '../api'
 import { useAuth } from '../auth'
 import { useI18n } from '../i18n'
@@ -63,16 +62,6 @@ export function LoginPage() {
             </Button>
           </form>
         </Panel>
-        <details className="mt-4 rounded-2xl border border-line bg-white p-4 text-sm shadow-sm">
-          <summary className="cursor-pointer font-semibold">{t('trainingAccounts')}</summary>
-          <p className="mt-2 text-muted">{t('trainingNote')}</p>
-          <p className="mt-2" dir="ltr">
-            focal.mudhaffar · focal.qahira · meal.taiz · admin.taiz
-          </p>
-          <p dir="ltr">
-            {t('passwordShared')}: {TRAINING_PASSWORD}
-          </p>
-        </details>
       </div>
     </main>
   )
