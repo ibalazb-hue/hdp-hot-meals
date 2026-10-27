@@ -48,6 +48,7 @@ interface DpEdit {
 }
 
 const DP_CODE = /^[A-Z0-9]{2,8}$/
+const USERNAME_OK = /^[a-z0-9._-]{3,32}$/
 
 export function AdminPage() {
   const { session } = useAuth()
@@ -71,15 +72,42 @@ export function AdminPage() {
     reload()
   }, [])
 
+  function roleOptions() {
+    return (
+      <>
+        <option value="dp_focal">{t('roleDpFocal')}</option>
+        <option value="meal">{t('roleMeal')}</option>
+        <option value="supervisor">{t('roleSupervisor')}</option>
+        <option value="admin">{t('roleAdmin')}</option>
+      </>
+    )
+  }
+
   async function createUser(event: FormEvent) {
     event.preventDefault()
+    const username = form.username.trim().toLowerCase()
+    if (!USERNAME_OK.test(username)) {
+      setMessage(t('usernameHint'))
+      return
+    }
+    if (form.password.length < 8) {
+      setMessage(t('passwordHint'))
+      return
+    }
+    if (form.role === 'supervisor' && !/^\d{4,8}$/.test(form.pin.trim())) {
+      setMessage(t('pinRequiredHint'))
+      return
+    }
     try {
       await apiJson('/api/admin/users', {
         method: 'POST',
         body: JSON.stringify({
-          ...form,
+          username,
+          displayName: form.displayName.trim(),
+          password: form.password,
+          role: form.role,
           dpCodes: form.dpCodes.split(',').map((code) => code.trim().toUpperCase()).filter(Boolean),
-          pin: form.pin || null,
+          pin: form.pin.trim() || null,
         }),
       })
       setMessage(t('userCreated'))
@@ -111,6 +139,10 @@ export function AdminPage() {
   async function saveEdit(event: FormEvent) {
     event.preventDefault()
     if (!editing) return
+    if (editing.role === 'supervisor' && editing.pin && !/^\d{4,8}$/.test(editing.pin.trim())) {
+      setMessage(t('pinRequiredHint'))
+      return
+    }
     try {
       await apiJson(`/api/admin/users/${editing.id}`, {
         method: 'PATCH',
@@ -122,7 +154,7 @@ export function AdminPage() {
           dpCodes: editing.dpCodes.split(',').map((code) => code.trim().toUpperCase()).filter(Boolean),
           active: editing.active,
           ...(editing.password ? { password: editing.password } : {}),
-          ...(editing.pin ? { pin: editing.pin } : {}),
+          ...(editing.pin ? { pin: editing.pin.trim() } : {}),
         }),
       })
       setEditing(null)
@@ -221,6 +253,7 @@ export function AdminPage() {
     <div className="grid gap-4">
       <Panel>
         <h2 className="text-xl font-bold">{t('users')}</h2>
+        {message ? <p className="mt-2 font-semibold text-ink">{message}</p> : null}
         <ul className="mt-2 text-sm">
           {users.map((user) => (
             <li key={user.id} className="flex min-h-14 items-center justify-between gap-2 border-b border-line py-2">
@@ -259,21 +292,20 @@ export function AdminPage() {
             )}
             <Field label={t('role')}>
               <SelectInput value={editing.role} onChange={(event) => setEditing({ ...editing, role: event.target.value })}>
-                <option value="dp_focal">dp_focal</option>
-                <option value="meal">meal</option>
-                <option value="supervisor">supervisor</option>
-                <option value="admin">admin</option>
+                {roleOptions()}
               </SelectInput>
             </Field>
             <Field label={t('assigned')}>
               <TextInput dir="ltr" value={editing.dpCodes} onChange={(event) => setEditing({ ...editing, dpCodes: event.target.value })} />
             </Field>
+            <p className="text-sm text-muted">{t('assignedHint')}</p>
             <Field label={t('passwordKeep')}>
               <TextInput type="password" value={editing.password} onChange={(event) => setEditing({ ...editing, password: event.target.value })} />
             </Field>
             <Field label={t('pin')}>
               <TextInput dir="ltr" value={editing.pin} onChange={(event) => setEditing({ ...editing, pin: event.target.value })} />
             </Field>
+            {editing.role === 'supervisor' ? <p className="text-sm text-muted">{t('pinRequiredHint')}</p> : null}
             <label className="flex min-h-12 items-center gap-2 font-semibold">
               <input type="checkbox" checked={editing.active} onChange={(event) => setEditing({ ...editing, active: event.target.checked })} />
               {t('active')}
@@ -286,18 +318,36 @@ export function AdminPage() {
             </div>
           </form>
         ) : null}
-        <form className="mt-3 grid gap-2" onSubmit={createUser}>
-          <TextInput placeholder={t('username')} value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} />
-          <TextInput placeholder={t('displayName')} value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} />
-          <TextInput placeholder={t('newPassword')} type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />
-          <SelectInput value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>
-            <option value="dp_focal">dp_focal</option>
-            <option value="meal">meal</option>
-            <option value="supervisor">supervisor</option>
-            <option value="admin">admin</option>
-          </SelectInput>
-          <TextInput placeholder="MDF01, MDF02" dir="ltr" value={form.dpCodes} onChange={(event) => setForm({ ...form, dpCodes: event.target.value })} />
-          <TextInput placeholder={t('pin')} dir="ltr" value={form.pin} onChange={(event) => setForm({ ...form, pin: event.target.value })} />
+        <form className="mt-3 grid gap-2" onSubmit={(event) => void createUser(event)}>
+          <h3 className="text-lg font-bold">{t('createUser')}</h3>
+          <Field label={t('username')}>
+            <TextInput
+              dir="ltr"
+              value={form.username}
+              onChange={(event) => setForm({ ...form, username: event.target.value.toLowerCase() })}
+            />
+          </Field>
+          <p className="text-sm text-muted">{t('usernameHint')}</p>
+          <Field label={t('displayName')}>
+            <TextInput value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} />
+          </Field>
+          <Field label={t('newPassword')}>
+            <TextInput type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />
+          </Field>
+          <p className="text-sm text-muted">{t('passwordHint')}</p>
+          <Field label={t('role')}>
+            <SelectInput value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>
+              {roleOptions()}
+            </SelectInput>
+          </Field>
+          <Field label={t('assigned')}>
+            <TextInput dir="ltr" value={form.dpCodes} onChange={(event) => setForm({ ...form, dpCodes: event.target.value })} />
+          </Field>
+          <p className="text-sm text-muted">{t('assignedHint')}</p>
+          <Field label={t('pin')}>
+            <TextInput dir="ltr" value={form.pin} onChange={(event) => setForm({ ...form, pin: event.target.value })} />
+          </Field>
+          {form.role === 'supervisor' ? <p className="text-sm text-muted">{t('pinRequiredHint')}</p> : null}
           <Button type="submit">{t('create')}</Button>
         </form>
       </Panel>
@@ -406,7 +456,6 @@ export function AdminPage() {
           ))}
         </ul>
       </Panel>
-      {message ? <p>{message}</p> : null}
     </div>
   )
 }
