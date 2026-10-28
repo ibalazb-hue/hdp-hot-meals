@@ -301,6 +301,31 @@ describe('admin users', () => {
   })
 })
 
+describe('home served today API', () => {
+  it('lets meal and admin see uniqueServed from all their accessible DPs after a focal serves', async () => {
+    const focal = await login('focal.mudhaffar')
+    const meal = await login('meal.taiz')
+    const admin = await login('admin.taiz')
+    const date = adenDate()
+
+    await postScan(focal.token, scan(focal.user.id, { cardCode: 'CMDF01000101' }))
+
+    for (const actor of [meal, admin]) {
+      const dashboard = await app.request(`/api/dashboard?date=${date}`, { headers: auth(actor.token) })
+      expect(dashboard.status).toBe(200)
+      const body = (await dashboard.json()) as { uniqueServed: number }
+      expect(body.uniqueServed).toBeGreaterThanOrEqual(1)
+    }
+
+    // Admin with no user_dps rows still receives servedToday in the sync bundle.
+    await db.query(`DELETE FROM user_dps WHERE user_id = $1`, [admin.user.id])
+    const bundle = await app.request('/api/sync/bundle', { headers: auth(admin.token) })
+    expect(bundle.status).toBe(200)
+    const bundleBody = (await bundle.json()) as { servedToday: Array<{ hhCode: string }> }
+    expect(bundleBody.servedToday.length).toBeGreaterThanOrEqual(1)
+  })
+})
+
 describe('admin distribution points', () => {
   it('creates and updates a point, and refuses a code change without dropping households', async () => {
     const admin = await login('admin.taiz')

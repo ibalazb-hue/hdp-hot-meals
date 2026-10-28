@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { adenDate, type Role } from '@hdp/rules'
+import { apiJson } from '../api'
 import { useAuth } from '../auth'
 import { db } from '../db'
 import { bundleAge, pendingCount } from '../submit'
@@ -55,14 +56,34 @@ export function HomePage() {
 
   const refresh = useCallback(() => {
     const date = adenDate()
-    void db.scans
-      .where('scanDate')
-      .equals(date)
-      .and((scan) => scan.countsAsDistributed)
-      .count()
-      .then(setServed)
     void pendingCount().then(setPending)
     void bundleAge().then(setUpdated)
+    void (async () => {
+      // Prefer server uniqueServed so meal/admin see all assigned DPs (not only this device).
+      try {
+        if (typeof navigator === 'undefined' || navigator.onLine) {
+          const remote = await apiJson<{ uniqueServed: number }>(`/api/dashboard?date=${date}`)
+          setServed(remote.uniqueServed)
+          return
+        }
+      } catch {
+        /* fall through to local caches */
+      }
+      // Offline / API fail: unique households from last sync bundle (+ local rememberServed).
+      const fromServed = await db.served.where('scanDate').equals(date).count()
+      if (fromServed > 0) {
+        setServed(fromServed)
+        return
+      }
+      // Last resort: this device's local counting scans only.
+      setServed(
+        await db.scans
+          .where('scanDate')
+          .equals(date)
+          .and((scan) => scan.countsAsDistributed)
+          .count(),
+      )
+    })()
   }, [])
 
   useEffect(() => {

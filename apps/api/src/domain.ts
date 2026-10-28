@@ -479,18 +479,20 @@ export async function applyScans(db: Database, actor: Actor, scans: IncomingScan
 
 export async function syncBundle(db: Database, actor: Actor) {
   const scanDate = adenDate()
-  if (actor.dpCodes.length === 0) {
+  // Admin: every active DP. Others: assigned user_dps (same as dashboard).
+  const scopeCodes = await accessibleDpCodes(db, actor)
+  if (scopeCodes.length === 0) {
     return { generatedAt: new Date().toISOString(), scanDate, dps: [], households: [], voidedCards: [], servedToday: [], revokedToday: [], supervisorPins: [] }
   }
-  const dpsIn = inClause(actor.dpCodes, 1)
+  const dpsIn = inClause(scopeCodes, 1)
   const dps = await db.query(
     `SELECT code, name_en, name_ar, district, latitude, longitude, gps_radius_m, gps_check_active
      FROM distribution_points WHERE active = TRUE AND code IN (${dpsIn.sql}) ORDER BY code`,
-    actor.dpCodes,
+    scopeCodes,
   )
   const households = await db.query(
     `SELECT hh_code, dp_code, status, active_card_code FROM households WHERE dp_code IN (${dpsIn.sql}) ORDER BY hh_code`,
-    actor.dpCodes,
+    scopeCodes,
   )
   const voidedCards = await db.query(
     `SELECT DISTINCT ci.card_code, ci.hh_code
@@ -498,10 +500,10 @@ export async function syncBundle(db: Database, actor: Actor) {
      JOIN households h ON h.hh_code = ci.hh_code
      WHERE h.dp_code IN (${dpsIn.sql})
        AND (h.active_card_code IS NULL OR ci.card_code <> h.active_card_code)`,
-    actor.dpCodes,
+    scopeCodes,
   )
-  const servedParams = [scanDate, ...actor.dpCodes]
-  const servedIn = inClause(actor.dpCodes, 2)
+  const servedParams = [scanDate, ...scopeCodes]
+  const servedIn = inClause(scopeCodes, 2)
   const servedToday = await db.query(
     `SELECT id, hh_code, result, scanned_at, dp_code
      FROM meal_scans
