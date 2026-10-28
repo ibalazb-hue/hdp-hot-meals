@@ -12,6 +12,16 @@ interface Issued {
   cardCode: string
   payload: string
   beneficiaryCount: number
+  label?: string | null
+  dpNameEn?: string | null
+  dpNameAr?: string | null
+  holderName?: string | null
+  cardSerial?: string | null
+  printBatch?: string | null
+  validFrom?: string | null
+  validTo?: string | null
+  wfpHotline?: string | null
+  hdpHotline?: string | null
 }
 
 export function RegisterPage() {
@@ -79,7 +89,20 @@ export function RegisterPage() {
         <div>
           <Alert tone="ok">{t('registered')}</Alert>
           <div className="mt-3">
-            <QrCard hhCode={issued.hhCode} payload={issued.payload} dpName={point ? `${point.nameEn} / ${point.nameAr}` : issued.dpCode} beneficiaryCount={issued.beneficiaryCount} />
+            <QrCard
+              hhCode={issued.hhCode}
+              holderName={issued.holderName ?? issued.label ?? label}
+              dpCode={issued.dpCode}
+              dpNameEn={issued.dpNameEn ?? point?.nameEn}
+              dpNameAr={issued.dpNameAr ?? point?.nameAr}
+              validFrom={issued.validFrom}
+              validTo={issued.validTo}
+              cardSerial={issued.cardSerial ?? issued.cardCode}
+              printBatch={issued.printBatch}
+              wfpHotline={issued.wfpHotline}
+              hdpHotline={issued.hdpHotline}
+              beneficiaryCount={issued.beneficiaryCount}
+            />
           </div>
         </div>
       ) : null}

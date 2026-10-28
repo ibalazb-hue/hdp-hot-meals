@@ -91,10 +91,46 @@ textarea {
 }
 
 @media print {
+  @page {
+    margin: 10mm;
+  }
   body {
-    background: white;
+    background: white !important;
   }
   .no-print {
     display: none !important;
+  }
+  /* Print only the entitlement card faces */
+  body * {
+    visibility: hidden !important;
+  }
+  .entitlement-print,
+  .entitlement-print * {
+    visibility: visible !important;
+  }
+  .entitlement-print {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white;
+  }
+  .entitlement-face {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    max-width: 105mm;
+    margin: 0 auto;
+    padding: 5mm !important;
+  }
+  .entitlement-front {
+    page-break-after: avoid;
+  }
+  img {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }

@@ -600,6 +600,30 @@ function requireWriter(actor: Actor): void {
   if (actor.role !== 'meal' && actor.role !== 'admin') throw new HttpError(403, 'forbidden')
 }
 
+
+export function cardPrintSettings() {
+  return {
+    validFrom: process.env.CARD_VALID_FROM?.trim() || null,
+    validTo: process.env.CARD_VALID_TO?.trim() || null,
+    wfpHotline: process.env.WFP_HOTLINE?.trim() || null,
+    hdpHotline: process.env.HDP_HOTLINE?.trim() || null,
+  }
+}
+
+function printBatchId(cardCode: string, issuedAt: string | null | undefined): string {
+  const day = (issuedAt ?? '').slice(0, 10).replace(/-/g, '') || '00000000'
+  const tail = cardCode.replace(/[^A-Z0-9]/gi, '').slice(-4).toUpperCase() || 'XXXX'
+  return `PB-${day}-${tail}`
+}
+
+async function dpNames(db: Queryable, dpCode: string): Promise<{ nameEn: string; nameAr: string }> {
+  const rows = await db.query(`SELECT name_en, name_ar FROM distribution_points WHERE code = $1`, [dpCode])
+  return {
+    nameEn: rows[0] ? String(rows[0].name_en) : dpCode,
+    nameAr: rows[0] ? String(rows[0].name_ar) : dpCode,
+  }
+}
+
 export async function createHousehold(
   db: Database,
   actor: Actor,
@@ -636,7 +660,26 @@ export async function createHousehold(
        VALUES ($1, $2, $3, 'issue', 'Initial issue', $4)`,
       [crypto.randomUUID(), hhCode, cardCode, actor.id],
     )
-    return { hhCode, dpCode, cardCode, payload: cardPayload(cardCode, hhCode), beneficiaryCount: input.beneficiaryCount, label }
+    const names = await dpNames(tx, dpCode)
+    const settings = cardPrintSettings()
+    const issuedAt = new Date().toISOString()
+    return {
+      hhCode,
+      dpCode,
+      cardCode,
+      payload: cardPayload(cardCode, hhCode),
+      beneficiaryCount: input.beneficiaryCount,
+      label,
+      dpNameEn: names.nameEn,
+      dpNameAr: names.nameAr,
+      holderName: label,
+      cardSerial: cardCode,
+      printBatch: printBatchId(cardCode, issuedAt),
+      validFrom: settings.validFrom ?? adenDate(),
+      validTo: settings.validTo,
+      wfpHotline: settings.wfpHotline,
+      hdpHotline: settings.hdpHotline,
+    }
   })
 }
 
@@ -736,14 +779,30 @@ export async function getHousehold(db: Database, actor: Actor, hhCode: string) {
      FROM card_issuance WHERE hh_code = $1 ORDER BY created_at DESC LIMIT 8`,
     [code],
   )
+  const dpCode = String(rows[0].dp_code)
+  const names = await dpNames(db, dpCode)
+  const settings = cardPrintSettings()
+  const activeCard = rows[0].active_card_code == null ? null : String(rows[0].active_card_code)
+  const latestIssue = history.find((row) => row.action === 'issue' || row.action === 'reissue') ?? history[0]
+  const issuedAt = latestIssue ? asText(latestIssue.created_at) : asText(rows[0].created_at)
+  const createdDay = (asText(rows[0].created_at) ?? '').slice(0, 10) || adenDate()
   return {
     hhCode: code,
-    dpCode: String(rows[0].dp_code),
+    dpCode,
     beneficiaryCount: Number(rows[0].beneficiary_count),
     label: rows[0].label == null ? null : String(rows[0].label),
     status: String(rows[0].status),
-    activeCardCode: rows[0].active_card_code == null ? null : String(rows[0].active_card_code),
-    payload: rows[0].active_card_code ? cardPayload(String(rows[0].active_card_code), code) : null,
+    activeCardCode: activeCard,
+    payload: activeCard ? cardPayload(activeCard, code) : null,
+    dpNameEn: names.nameEn,
+    dpNameAr: names.nameAr,
+    holderName: rows[0].label == null ? null : String(rows[0].label),
+    cardSerial: activeCard,
+    printBatch: activeCard ? printBatchId(activeCard, issuedAt) : null,
+    validFrom: settings.validFrom ?? createdDay,
+    validTo: settings.validTo,
+    wfpHotline: settings.wfpHotline,
+    hdpHotline: settings.hdpHotline,
     history: history.map((row) => ({
       cardCode: String(row.card_code),
       action: String(row.action),

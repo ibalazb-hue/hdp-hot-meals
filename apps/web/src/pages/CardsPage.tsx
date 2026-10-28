@@ -14,6 +14,15 @@ interface Household {
   status: string
   activeCardCode: string | null
   payload: string | null
+  dpNameEn?: string | null
+  dpNameAr?: string | null
+  holderName?: string | null
+  cardSerial?: string | null
+  printBatch?: string | null
+  validFrom?: string | null
+  validTo?: string | null
+  wfpHotline?: string | null
+  hdpHotline?: string | null
 }
 
 interface DpOption {
@@ -109,8 +118,8 @@ export function CardsPage() {
 
   return (
     <div className="grid gap-4">
-      <PageHeader title={t('cards')} subtitle={t('tileCards')} />
-      <Panel className="grid gap-3">
+      <div className="no-print"><PageHeader title={t('cards')} subtitle={t('tileCards')} /></div>
+      <Panel className="no-print grid gap-3">
         <Field label={t('search')} hint={t('householdSearchHint')}>
           <TextInput data-testid="card-search" dir="ltr" value={query} onChange={(event) => setQuery(event.target.value)} />
         </Field>
@@ -198,8 +207,21 @@ export function CardsPage() {
             </Button>
           </div>
           {message ? <Alert tone={tone === 'ok' ? 'ok' : 'danger'}>{message}</Alert> : null}
-          {selected.payload && selected.activeCardCode ? (
-            <QrCard hhCode={selected.hhCode} payload={selected.payload} dpName={selected.dpCode} beneficiaryCount={selected.beneficiaryCount} />
+          {selected.activeCardCode ? (
+            <QrCard
+              hhCode={selected.hhCode}
+              holderName={selected.holderName ?? selected.label}
+              dpCode={selected.dpCode}
+              dpNameEn={selected.dpNameEn}
+              dpNameAr={selected.dpNameAr}
+              validFrom={selected.validFrom}
+              validTo={selected.validTo}
+              cardSerial={selected.cardSerial ?? selected.activeCardCode}
+              printBatch={selected.printBatch}
+              wfpHotline={selected.wfpHotline}
+              hdpHotline={selected.hdpHotline}
+              beneficiaryCount={selected.beneficiaryCount}
+            />
           ) : null}
         </Panel>
       ) : null}
