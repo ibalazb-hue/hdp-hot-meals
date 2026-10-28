@@ -399,5 +399,39 @@ describe('admin distribution points', () => {
     })
     expect(points.find((row) => row.code === 'MDF06')?.nameEn).toBe('Sample site')
     expect(points.some((row) => row.code === 'MDF99')).toBe(false)
+    const mdf01 = points.find((row) => row.code === 'MDF01') as {
+      householdCount: number
+      assignedUsers: Array<{ id: string; role: string }>
+    }
+    expect(mdf01.householdCount).toBeGreaterThan(0)
+    expect(mdf01.assignedUsers.some((user) => user.role === 'dp_focal')).toBe(true)
+
+    const usersFull = (await (await app.request('/api/admin/users', { headers: auth(admin.token) })).json()) as Array<{
+      id: string
+      username: string
+      dpCodes: string[]
+    }>
+    const mealUser = usersFull.find((row) => row.username === 'meal.taiz')
+    const focalUser = usersFull.find((row) => row.username === 'focal.mudhaffar')
+    expect(mealUser && focalUser).toBeTruthy()
+    const assigned = await app.request('/api/admin/dps/MDF06', {
+      method: 'PATCH',
+      headers: auth(admin.token),
+      body: JSON.stringify({
+        nameEn: 'Sample site',
+        nameAr: 'موقع تجريبي',
+        userIds: [mealUser!.id, focalUser!.id],
+      }),
+    })
+    expect(assigned.status).toBe(200)
+    const assignedBody = (await assigned.json()) as { assignedUsers: Array<{ id: string }> }
+    expect(assignedBody.assignedUsers.map((user) => user.id).sort()).toEqual([mealUser!.id, focalUser!.id].sort())
+    const focalAfter = (
+      (await (await app.request('/api/admin/users', { headers: auth(admin.token) })).json()) as Array<{
+        username: string
+        dpCodes: string[]
+      }>
+    ).find((row) => row.username === 'focal.mudhaffar')
+    expect(focalAfter?.dpCodes.sort()).toEqual(['MDF01', 'MDF02', 'MDF06'])
   })
 })

@@ -315,8 +315,13 @@ paths:
                 active:
                   type: boolean
                   description: Setting this false keeps households, cards, scans, and user assignments.
+                userIds:
+                  type: array
+                  maxItems: 200
+                  items: { type: string }
+                  description: When present, replaces which users are assigned to this point only. Other DP assignments for those users are kept.
       responses:
-        '200': { description: English name, Arabic name, district, or active flag updated. History is kept. }
+        '200': { description: Point fields updated; optional staff assignment replaced for this code. History kept. }
         '404': { description: Unknown distribution point }
         '409': { description: The distribution point code cannot be changed after it is created }
   /api/admin/users:

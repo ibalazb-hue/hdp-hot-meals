@@ -836,15 +836,37 @@ export async function exportRegister(db: Database, actor: Actor, scanDate: strin
 
 export async function listDps(db: Database) {
   const rows = await db.query(
-    `SELECT code, name_en, name_ar, district, active FROM distribution_points ORDER BY code`,
+    `SELECT d.code, d.name_en, d.name_ar, d.district, d.active,
+            COALESCE((SELECT COUNT(*)::int FROM households h WHERE h.dp_code = d.code AND h.status = 'active'), 0) AS household_count
+     FROM distribution_points d
+     ORDER BY d.code`,
   )
-  return rows.map((row) => ({
-    code: String(row.code),
-    nameEn: String(row.name_en),
-    nameAr: String(row.name_ar),
-    district: String(row.district),
-    active: asBool(row.active),
-  }))
+  const links = await db.query(
+    `SELECT ud.dp_code, u.id, u.username, u.display_name, u.role, u.active
+     FROM user_dps ud
+     JOIN users u ON u.id = ud.user_id
+     ORDER BY u.username`,
+  )
+  return rows.map((row) => {
+    const code = String(row.code)
+    return {
+      code,
+      nameEn: String(row.name_en),
+      nameAr: String(row.name_ar),
+      district: String(row.district),
+      active: asBool(row.active),
+      householdCount: Number(row.household_count) || 0,
+      assignedUsers: links
+        .filter((link) => String(link.dp_code) === code)
+        .map((link) => ({
+          id: String(link.id),
+          username: String(link.role) === 'supervisor' ? '' : String(link.username),
+          displayName: String(link.role) === 'supervisor' ? '' : String(link.display_name),
+          role: String(link.role),
+          active: asBool(link.active),
+        })),
+    }
+  })
 }
 
 const DP_CODE = /^[A-Z0-9]{2,8}$/
@@ -876,13 +898,42 @@ export async function createDp(
     if (isUniqueViolation(error)) throw new HttpError(409, 'dp_code_taken')
     throw error
   }
-  return { code, nameEn, nameAr, district: input.district, active }
+  return {
+    code,
+    nameEn,
+    nameAr,
+    district: input.district,
+    active,
+    householdCount: 0,
+    assignedUsers: [] as Array<{ id: string; username: string; displayName: string; role: string; active: boolean }>,
+  }
+}
+
+async function replaceDpAssignments(db: Database, dpCode: string, userIds: string[]) {
+  const unique = [...new Set(userIds.map((id) => id.trim()).filter(Boolean))]
+  for (const id of unique) {
+    const found = await db.query(`SELECT id FROM users WHERE id = $1`, [id])
+    if (!found[0]) throw new HttpError(400, 'invalid_body')
+  }
+  await db.transaction(async (tx) => {
+    await tx.query(`DELETE FROM user_dps WHERE dp_code = $1`, [dpCode])
+    for (const id of unique) {
+      await tx.query(`INSERT INTO user_dps (user_id, dp_code) VALUES ($1, $2)`, [id, dpCode])
+    }
+  })
 }
 
 export async function patchDp(
   db: Database,
   code: string,
-  input: { code?: string; active?: boolean; nameEn?: string; nameAr?: string; district?: District },
+  input: {
+    code?: string
+    active?: boolean
+    nameEn?: string
+    nameAr?: string
+    district?: District
+    userIds?: string[]
+  },
 ) {
   const currentCode = code.trim().toUpperCase()
   const current = await db.query(
@@ -901,7 +952,10 @@ export async function patchDp(
     `UPDATE distribution_points SET name_en = $2, name_ar = $3, district = $4, active = $5 WHERE code = $1`,
     [currentCode, nameEn, nameAr, district, active],
   )
-  return { code: currentCode, nameEn, nameAr, district, active }
+  if (input.userIds) await replaceDpAssignments(db, currentCode, input.userIds)
+  const listed = await listDps(db)
+  const row = listed.find((item) => item.code === currentCode)
+  return row ?? { code: currentCode, nameEn, nameAr, district, active, householdCount: 0, assignedUsers: [] }
 }
 
 export async function listUsers(db: Database) {

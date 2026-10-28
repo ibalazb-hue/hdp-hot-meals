@@ -216,6 +216,7 @@ export function createApp(db: Database, options?: { distDir?: string }) {
         nameEn: z.string().trim().min(2).max(80).optional(),
         nameAr: z.string().trim().min(2).max(80).optional(),
         district: z.enum(['Al-Mudhaffar', 'Al-Qahira']).optional(),
+        userIds: z.array(z.string().min(1).max(64)).max(200).optional(),
       }),
       await c.req.json(),
     )

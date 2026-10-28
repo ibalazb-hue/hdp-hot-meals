@@ -15,12 +15,22 @@ interface UserRow {
   dpCodes: string[]
 }
 
+interface AssignedUser {
+  id: string
+  username: string
+  displayName: string
+  role: string
+  active: boolean
+}
+
 interface DpRow {
   code: string
   nameEn: string
   nameAr: string
   district: string
   active: boolean
+  householdCount?: number
+  assignedUsers?: AssignedUser[]
 }
 
 interface DeviceRow {
@@ -46,6 +56,7 @@ interface DpEdit {
   nameAr: string
   district: string
   active: boolean
+  userIds: string[]
 }
 
 type Tab = 'access' | 'points' | 'devices'
@@ -77,6 +88,9 @@ export function AdminPage() {
   const [editingPoint, setEditingPoint] = useState<DpEdit | null>(null)
   const [point, setPoint] = useState({ code: '', nameEn: '', nameAr: '', district: 'Al-Mudhaffar', active: true })
   const [showCreatePoint, setShowCreatePoint] = useState(false)
+  const [pointQuery, setPointQuery] = useState('')
+  const [districtFilter, setDistrictFilter] = useState('all')
+  const [pointStatus, setPointStatus] = useState('all')
 
   function reload() {
     void apiJson<UserRow[]>('/api/admin/users').then(setUsers)
@@ -137,6 +151,22 @@ export function AdminPage() {
     }
     return { byRole, active, total: users.length }
   }, [users])
+
+  const filteredDps = useMemo(() => {
+    const q = pointQuery.trim().toLowerCase()
+    return dps.filter((dp) => {
+      if (districtFilter !== 'all' && dp.district !== districtFilter) return false
+      if (pointStatus === 'active' && !dp.active) return false
+      if (pointStatus === 'off' && dp.active) return false
+      if (!q) return true
+      return (
+        dp.code.toLowerCase().includes(q) ||
+        dp.nameEn.toLowerCase().includes(q) ||
+        dp.nameAr.includes(pointQuery.trim()) ||
+        dp.district.toLowerCase().includes(q)
+      )
+    })
+  }, [dps, pointQuery, districtFilter, pointStatus])
 
   async function createUser(event: FormEvent) {
     event.preventDefault()
@@ -236,9 +266,25 @@ export function AdminPage() {
       nameAr: dp.nameAr,
       district: dp.district,
       active: dp.active,
+      userIds: (dp.assignedUsers ?? []).map((user) => user.id),
     })
     setShowCreatePoint(false)
     setMessage('')
+  }
+
+  function togglePointUser(userId: string) {
+    setEditingPoint((current) => {
+      if (!current) return current
+      const set = new Set(current.userIds)
+      if (set.has(userId)) set.delete(userId)
+      else set.add(userId)
+      return { ...current, userIds: [...set] }
+    })
+  }
+
+  function staffLabel(user: { role: string; username: string; displayName: string }) {
+    if (user.role === 'supervisor') return t('roleSupervisor')
+    return user.displayName || user.username
   }
 
   async function createPoint(event: FormEvent) {
@@ -287,6 +333,7 @@ export function AdminPage() {
           nameAr: editingPoint.nameAr.trim(),
           district: editingPoint.district,
           active: editingPoint.active,
+          userIds: editingPoint.userIds,
         }),
       })
       setEditingPoint(null)
@@ -552,7 +599,10 @@ export function AdminPage() {
         <div className="grid gap-4">
           <Panel className="grid gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-lg font-bold">{t('points')}</h2>
+              <div>
+                <h2 className="text-lg font-bold">{t('points')}</h2>
+                <p className="mt-1 text-sm text-muted">{t('pointsSubtitle')}</p>
+              </div>
               <Button
                 type="button"
                 size="sm"
@@ -561,12 +611,31 @@ export function AdminPage() {
                   setEditingPoint(null)
                 }}
               >
-                {showCreatePoint ? t('cancel') : t('create')}
+                {showCreatePoint ? t('cancel') : t('createPoint')}
               </Button>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+              <TextInput
+                value={pointQuery}
+                onChange={(event) => setPointQuery(event.target.value)}
+                placeholder={t('searchPoints')}
+              />
+              <SelectInput value={districtFilter} onChange={(event) => setDistrictFilter(event.target.value)}>
+                <option value="all">{t('allDistricts')}</option>
+                <option value="Al-Mudhaffar">{t('districtMudhaffar')}</option>
+                <option value="Al-Qahira">{t('districtQahira')}</option>
+              </SelectInput>
+              <SelectInput value={pointStatus} onChange={(event) => setPointStatus(event.target.value)}>
+                <option value="all">{t('allStatuses')}</option>
+                <option value="active">{t('active')}</option>
+                <option value="off">{t('off')}</option>
+              </SelectInput>
             </div>
 
             {showCreatePoint ? (
               <form id="create-dp" className="grid gap-3 rounded-2xl border border-lagoon/30 bg-mist/40 p-4" onSubmit={(event) => void createPoint(event)}>
+                <h3 className="font-bold text-teal">{t('createPoint')}</h3>
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field label={t('pointCode')} hint={t('invalid_dp_code')}>
                     <TextInput
@@ -591,14 +660,15 @@ export function AdminPage() {
                 </div>
                 <label className="flex min-h-12 items-center gap-2 font-semibold">
                   <input id="create-dp-active" type="checkbox" checked={point.active} onChange={(event) => setPoint({ ...point, active: event.target.checked })} />
-                  {t('active')}
+                  {t('active')} — {t('pointActiveHint')}
                 </label>
                 <Button type="submit">{t('create')}</Button>
               </form>
             ) : null}
 
             {editingPoint ? (
-              <form id="edit-dp" className="grid gap-3 rounded-2xl border border-line p-4" onSubmit={(event) => void savePoint(event)}>
+              <form id="edit-dp" className="grid gap-3 rounded-2xl border border-line bg-white p-4 shadow-sm" onSubmit={(event) => void savePoint(event)}>
+                <h3 className="font-bold">{t('editPoint')}</h3>
                 <Field label={t('pointCode')} hint={t('codeFixed')}>
                   <TextInput id="edit-dp-code" dir="ltr" value={editingPoint.code} readOnly />
                 </Field>
@@ -635,37 +705,100 @@ export function AdminPage() {
                     checked={editingPoint.active}
                     onChange={(event) => setEditingPoint({ ...editingPoint, active: event.target.checked })}
                   />
-                  {t('active')}
+                  {t('active')} — {t('pointActiveHint')}
                 </label>
-                <div className="flex gap-2">
+                <Field label={t('staffAtPoint')} hint={t('staffAtPointHint')}>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {users.map((user) => {
+                      const on = editingPoint.userIds.includes(user.id)
+                      return (
+                        <button
+                          key={user.id}
+                          type="button"
+                          onClick={() => togglePointUser(user.id)}
+                          className={`min-h-12 rounded-xl border px-3 py-2 text-start text-sm font-semibold transition ${
+                            on ? 'border-teal bg-teal text-white' : 'border-line bg-white text-ink hover:bg-mist'
+                          }`}
+                        >
+                          <span className="flex flex-wrap items-center gap-2">
+                            <RoleBadge role={user.role} label={roleLabel(user.role)} />
+                            <StatusPill on={user.active} onLabel={t('active')} offLabel={t('off')} />
+                          </span>
+                          <span className="mt-1 block truncate">{staffLabel(user)}</span>
+                          {user.role === 'supervisor' ? null : (
+                            <span className="block font-mono text-xs opacity-80" dir="ltr">
+                              {user.username}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </Field>
+                <div className="flex flex-wrap gap-2">
                   <Button type="submit">{t('save')}</Button>
                   <Button type="button" tone="sand" onClick={() => setEditingPoint(null)}>
                     {t('cancel')}
+                  </Button>
+                  <Button
+                    type="button"
+                    tone="sand"
+                    onClick={() => {
+                      const code = editingPoint.code
+                      setEditingPoint(null)
+                      setTab('access')
+                      setQuery(code)
+                    }}
+                  >
+                    {t('openInAccess')}
                   </Button>
                 </div>
               </form>
             ) : null}
 
-            <ul className="grid gap-2 lg:grid-cols-2">
-              {dps.map((dp) => (
-                <li key={dp.code} data-code={dp.code} className="flex items-center justify-between gap-3 rounded-2xl border border-line p-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono font-bold" dir="ltr">
-                        {dp.code}
-                      </span>
-                      <StatusPill on={dp.active} onLabel={t('active')} offLabel={t('off')} />
+            {filteredDps.length === 0 ? <EmptyState title={t('empty')} body={t('noPointsMatch')} /> : null}
+            <ul className="grid gap-3 lg:grid-cols-2">
+              {filteredDps.map((dp) => {
+                const staff = dp.assignedUsers ?? []
+                return (
+                  <li key={dp.code} data-code={dp.code} className="rounded-2xl border border-line bg-white p-3 sm:p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-base font-bold" dir="ltr">
+                            {dp.code}
+                          </span>
+                          <StatusPill on={dp.active} onLabel={t('active')} offLabel={t('off')} />
+                        </div>
+                        <p className="mt-1 truncate font-semibold">
+                          {locale === 'ar' ? dp.nameAr : dp.nameEn}
+                        </p>
+                        <p className="truncate text-sm text-muted">
+                          {locale === 'ar' ? dp.nameEn : dp.nameAr} · {districtLabel(dp.district)}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-muted">
+                          <span className="rounded-full bg-mist px-2.5 py-1">
+                            {t('householdsShort')}: <span className="tabular text-ink">{dp.householdCount ?? 0}</span>
+                          </span>
+                          <span className="rounded-full bg-mist px-2.5 py-1">
+                            {t('staffShort')}: <span className="tabular text-ink">{staff.length}</span>
+                          </span>
+                        </div>
+                        {staff.length > 0 ? (
+                          <p className="mt-2 line-clamp-2 text-xs text-muted">
+                            {staff.map((user) => staffLabel(user)).join(' · ')}
+                          </p>
+                        ) : (
+                          <p className="mt-2 text-xs text-muted">{t('noStaffAssigned')}</p>
+                        )}
+                      </div>
+                      <Button type="button" size="sm" tone="sand" onClick={() => startPointEdit(dp)}>
+                        {t('edit')}
+                      </Button>
                     </div>
-                    <p className="truncate text-sm text-muted">
-                      {dp.nameEn} · {dp.nameAr}
-                    </p>
-                    <p className="text-xs text-muted">{districtLabel(dp.district)}</p>
-                  </div>
-                  <Button type="button" size="sm" tone="sand" onClick={() => startPointEdit(dp)}>
-                    {t('edit')}
-                  </Button>
-                </li>
-              ))}
+                  </li>
+                )
+              })}
             </ul>
           </Panel>
         </div>
