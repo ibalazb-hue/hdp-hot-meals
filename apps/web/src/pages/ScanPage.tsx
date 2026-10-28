@@ -82,11 +82,21 @@ export function ScanPage() {
   useEffect(() => {
     const qr = new Html5Qrcode('qr-reader')
     let alive = true
-    qr.start({ facingMode: 'environment' }, { fps: 8, qrbox: { width: 220, height: 220 } }, (text) => handler.current(text), () => undefined).catch(
-      () => {
-        if (alive) setCameraError(true)
+    qr.start(
+      { facingMode: 'environment' },
+      {
+        fps: 10,
+        aspectRatio: 1,
+        qrbox: (viewfinderWidth, viewfinderHeight) => {
+          const edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.78)
+          return { width: Math.max(240, edge), height: Math.max(240, edge) }
+        },
       },
-    )
+      (text) => handler.current(text),
+      () => undefined,
+    ).catch(() => {
+      if (alive) setCameraError(true)
+    })
     return () => {
       alive = false
       void qr.stop().catch(() => undefined)
@@ -107,7 +117,7 @@ export function ScanPage() {
   const rejectText = reasonLabel(t, result?.messageKey ?? result?.blockReason ?? 'unknown')
 
   return (
-    <div className="relative flex h-full min-h-0 flex-1 flex-col gap-3 overflow-hidden pb-2">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col gap-2 overflow-hidden pb-1">
       {result ? null : <PageHeader title={t('scan')} subtitle={t('tileScan')} />}
       {result ? (
         <div className="absolute inset-0 z-10 overflow-y-auto bg-canvas">
@@ -174,33 +184,31 @@ export function ScanPage() {
         </section>
         </div>
       ) : null}
-      {dps.length > 1 ? (
-        <Field label={t('dp')}>
-          <SelectInput data-testid="dp" value={dp} onChange={(event) => setDp(event.target.value)}>
+      <div className="flex shrink-0 items-center gap-2">
+        {dps.length > 1 ? (
+          <SelectInput data-testid="dp" className="min-h-11 flex-1" value={dp} onChange={(event) => setDp(event.target.value)}>
             {dps.map((code) => (
               <option key={code} value={code}>
                 {code}
               </option>
             ))}
           </SelectInput>
-        </Field>
-      ) : (
-        <p className="font-bold" dir="ltr">
-          {dp}
-        </p>
-      )}
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-teal shadow-sm">
-          <div id="qr-reader" className="min-h-0 flex-1" />
-          <div className="p-3">
-            <Button type="button" tone="sand" className="w-full" onClick={() => void toggleTorch()}>
-              {t('torch')}
-            </Button>
-          </div>
+        ) : (
+          <p className="flex-1 font-bold" dir="ltr">
+            {dp}
+          </p>
+        )}
+        <Button type="button" tone="sand" size="sm" className="shrink-0" onClick={() => void toggleTorch()}>
+          {t('torch')}
+        </Button>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+        <div className="scan-stage flex min-h-[min(68dvh,32rem)] flex-1 flex-col overflow-hidden rounded-2xl bg-teal shadow-sm sm:min-h-[min(72dvh,36rem)]">
+          <div id="qr-reader" className="min-h-0 flex-1" data-testid="qr-stage" />
         </div>
-        <Panel>
+        <Panel className="shrink-0 !p-3">
           <form
-            className="grid gap-3"
+            className="grid grid-cols-[1fr_auto] gap-2"
             onSubmit={(event) => {
               event.preventDefault()
               const field = event.currentTarget.elements.namedItem('card')
@@ -209,15 +217,22 @@ export function ScanPage() {
               if (cardCode) void record(cardCode)
             }}
           >
-            <Field label={t('cardCode')}>
-              <TextInput name="card" data-testid="card-code" dir="ltr" value={card} onChange={(event) => setCard(event.target.value.toUpperCase())} autoCapitalize="characters" />
-            </Field>
-            <Button data-testid="card-submit" type="submit">
+            <TextInput
+              name="card"
+              data-testid="card-code"
+              dir="ltr"
+              value={card}
+              onChange={(event) => setCard(event.target.value.toUpperCase())}
+              autoCapitalize="characters"
+              placeholder={t('cardCode')}
+              aria-label={t('cardCode')}
+            />
+            <Button data-testid="card-submit" type="submit" size="sm">
               {t('enterCard')}
             </Button>
           </form>
-          {cameraError ? <p className="mt-3 text-sm text-warn">{t('cameraFailed')}</p> : null}
-          {error ? <p className="mt-3 font-semibold text-blocked">{error}</p> : null}
+          {cameraError ? <p className="mt-2 text-sm text-warn">{t('cameraFailed')}</p> : null}
+          {error ? <p className="mt-2 font-semibold text-blocked">{error}</p> : null}
         </Panel>
       </div>
     </div>

@@ -1002,10 +1002,13 @@ export async function createDp(
 
 async function replaceDpAssignments(db: Database, dpCode: string, userIds: string[]) {
   const unique = [...new Set(userIds.map((id) => id.trim()).filter(Boolean))]
+  let supervisorCount = 0
   for (const id of unique) {
-    const found = await db.query(`SELECT id FROM users WHERE id = $1`, [id])
+    const found = await db.query(`SELECT id, role FROM users WHERE id = $1`, [id])
     if (!found[0]) throw new HttpError(400, 'invalid_body')
+    if (String(found[0].role) === 'supervisor') supervisorCount += 1
   }
+  if (supervisorCount > 1) throw new HttpError(400, 'too_many_supervisors')
   await db.transaction(async (tx) => {
     await tx.query(`DELETE FROM user_dps WHERE dp_code = $1`, [dpCode])
     for (const id of unique) {

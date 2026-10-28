@@ -64,7 +64,9 @@ interface DpEdit {
   longitude: string
   gpsRadiusM: string
   gpsCheckActive: boolean
-  userIds: string[]
+  supervisorId: string | null
+  distributorIds: string[]
+  otherIds: string[]
 }
 
 type Tab = 'access' | 'points' | 'devices'
@@ -308,6 +310,10 @@ export function AdminPage() {
   }
 
   function startPointEdit(dp: DpRow) {
+    const staff = dp.assignedUsers ?? []
+    const supervisors = staff.filter((user) => user.role === 'supervisor')
+    const distributors = staff.filter((user) => user.role === 'dp_focal')
+    const others = staff.filter((user) => user.role !== 'supervisor' && user.role !== 'dp_focal')
     setEditingPoint({
       code: dp.code,
       nameEn: dp.nameEn,
@@ -318,20 +324,30 @@ export function AdminPage() {
       longitude: dp.longitude == null ? '' : String(dp.longitude),
       gpsRadiusM: String(dp.gpsRadiusM ?? 150),
       gpsCheckActive: Boolean(dp.gpsCheckActive),
-      userIds: (dp.assignedUsers ?? []).map((user) => user.id),
+      supervisorId: supervisors[0]?.id ?? null,
+      distributorIds: distributors.map((user) => user.id),
+      otherIds: others.map((user) => user.id),
     })
     setShowCreatePoint(false)
     setMessage('')
   }
 
-  function togglePointUser(userId: string) {
+  function setPointSupervisor(userId: string | null) {
+    setEditingPoint((current) => (current ? { ...current, supervisorId: userId } : current))
+  }
+
+  function toggleDistributor(userId: string) {
     setEditingPoint((current) => {
       if (!current) return current
-      const set = new Set(current.userIds)
+      const set = new Set(current.distributorIds)
       if (set.has(userId)) set.delete(userId)
       else set.add(userId)
-      return { ...current, userIds: [...set] }
+      return { ...current, distributorIds: [...set] }
     })
+  }
+
+  function pointUserIds(edit: DpEdit) {
+    return [...new Set([edit.supervisorId, ...edit.distributorIds, ...edit.otherIds].filter(Boolean) as string[])]
   }
 
   function staffLabel(user: { role: string; username: string; displayName: string }) {
@@ -400,7 +416,7 @@ export function AdminPage() {
           nameAr: editingPoint.nameAr.trim(),
           district: editingPoint.district,
           active: editingPoint.active,
-          userIds: editingPoint.userIds,
+          userIds: pointUserIds(editingPoint),
           ...gps,
         }),
       })
@@ -507,6 +523,7 @@ export function AdminPage() {
 
       {tab === 'access' ? (
         <div className="grid gap-4">
+          <Alert tone="info">{t('accessTeamHint')}</Alert>
           <Panel className="grid gap-3">
             <h2 className="text-lg font-bold">{t('whoCanWhat')}</h2>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -865,34 +882,82 @@ export function AdminPage() {
                     {t('gpsCheckActive')}
                   </label>
                 </div>
-                <Field label={t('staffAtPoint')} hint={t('staffAtPointHint')}>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {users.map((user) => {
-                      const on = editingPoint.userIds.includes(user.id)
-                      return (
-                        <button
-                          key={user.id}
-                          type="button"
-                          onClick={() => togglePointUser(user.id)}
-                          className={`min-h-12 rounded-xl border px-3 py-2 text-start text-sm font-semibold transition ${
-                            on ? 'border-teal bg-teal text-white' : 'border-line bg-white text-ink hover:bg-mist'
-                          }`}
-                        >
-                          <span className="flex flex-wrap items-center gap-2">
-                            <RoleBadge role={user.role} label={roleLabel(user.role)} />
-                            <StatusPill on={user.active} onLabel={t('active')} offLabel={t('off')} />
-                          </span>
-                          <span className="mt-1 block truncate">{staffLabel(user)}</span>
-                          {user.role === 'supervisor' ? null : (
-                            <span className="block font-mono text-xs opacity-80" dir="ltr">
-                              {user.username}
-                            </span>
-                          )}
-                        </button>
-                      )
-                    })}
+                <div className="grid gap-4 rounded-2xl border border-line bg-mist/30 p-3">
+                  <div>
+                    <h4 className="font-bold text-teal">{t('pointTeam')}</h4>
+                    <p className="mt-1 text-xs text-muted">{t('pointTeamHint')}</p>
                   </div>
-                </Field>
+                  <Field label={t('pointSupervisor')} hint={t('pointSupervisorHint')}>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => setPointSupervisor(null)}
+                        className={`min-h-12 rounded-xl border px-3 py-2 text-start text-sm font-semibold transition ${
+                          editingPoint.supervisorId == null
+                            ? 'border-teal bg-teal text-white'
+                            : 'border-line bg-white text-ink hover:bg-mist'
+                        }`}
+                      >
+                        {t('noSupervisorYet')}
+                      </button>
+                      {users
+                        .filter((user) => user.role === 'supervisor')
+                        .map((user) => {
+                          const on = editingPoint.supervisorId === user.id
+                          return (
+                            <button
+                              key={user.id}
+                              type="button"
+                              onClick={() => setPointSupervisor(user.id)}
+                              className={`min-h-12 rounded-xl border px-3 py-2 text-start text-sm font-semibold transition ${
+                                on ? 'border-teal bg-teal text-white' : 'border-line bg-white text-ink hover:bg-mist'
+                              }`}
+                            >
+                              <span className="flex flex-wrap items-center gap-2">
+                                <RoleBadge role={user.role} label={roleLabel(user.role)} />
+                                <StatusPill on={user.active} onLabel={t('active')} offLabel={t('off')} />
+                              </span>
+                              <span className="mt-1 block truncate">{staffLabel(user)}</span>
+                            </button>
+                          )
+                        })}
+                    </div>
+                  </Field>
+                  <Field label={t('pointDistributors')} hint={t('pointDistributorsHint')}>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {users.filter((user) => user.role === 'dp_focal').length === 0 ? (
+                        <p className="text-sm text-muted">{t('noDistributorsAvailable')}</p>
+                      ) : null}
+                      {users
+                        .filter((user) => user.role === 'dp_focal')
+                        .map((user) => {
+                          const on = editingPoint.distributorIds.includes(user.id)
+                          return (
+                            <button
+                              key={user.id}
+                              type="button"
+                              onClick={() => toggleDistributor(user.id)}
+                              className={`min-h-12 rounded-xl border px-3 py-2 text-start text-sm font-semibold transition ${
+                                on ? 'border-teal bg-teal text-white' : 'border-line bg-white text-ink hover:bg-mist'
+                              }`}
+                            >
+                              <span className="flex flex-wrap items-center gap-2">
+                                <RoleBadge role={user.role} label={roleLabel(user.role)} />
+                                <StatusPill on={user.active} onLabel={t('active')} offLabel={t('off')} />
+                              </span>
+                              <span className="mt-1 block truncate">{staffLabel(user)}</span>
+                              <span className="block font-mono text-xs opacity-80" dir="ltr">
+                                {user.username}
+                              </span>
+                            </button>
+                          )
+                        })}
+                    </div>
+                  </Field>
+                  {editingPoint.otherIds.length > 0 ? (
+                    <p className="text-xs text-muted">{t('otherAccessKept')}</p>
+                  ) : null}
+                </div>
                 <div className="flex flex-wrap gap-2">
                   <Button type="submit">{t('save')}</Button>
                   <Button type="button" tone="sand" onClick={() => setEditingPoint(null)}>
@@ -939,7 +1004,16 @@ export function AdminPage() {
                             {t('householdsShort')}: <span className="tabular text-ink">{dp.householdCount ?? 0}</span>
                           </span>
                           <span className="rounded-full bg-mist px-2.5 py-1">
-                            {t('staffShort')}: <span className="tabular text-ink">{staff.length}</span>
+                            {t('pointSupervisor')}:{' '}
+                            <span className="text-ink">
+                              {staff.find((user) => user.role === 'supervisor')
+                                ? staffLabel(staff.find((user) => user.role === 'supervisor')!)
+                                : t('noSupervisorYet')}
+                            </span>
+                          </span>
+                          <span className="rounded-full bg-mist px-2.5 py-1">
+                            {t('pointDistributors')}:{' '}
+                            <span className="tabular text-ink">{staff.filter((user) => user.role === 'dp_focal').length}</span>
                           </span>
                           <span className={`rounded-full px-2.5 py-1 ${dp.gpsCheckActive ? 'bg-teal/15 text-teal' : 'bg-mist'}`}>
                             {dp.gpsCheckActive ? t('gpsOn') : t('gpsOff')}
@@ -953,12 +1027,16 @@ export function AdminPage() {
                             {Number(dp.latitude).toFixed(5)}, {Number(dp.longitude).toFixed(5)}
                           </p>
                         ) : null}
-                        {staff.length > 0 ? (
+                        {staff.filter((user) => user.role === 'dp_focal').length > 0 ? (
                           <p className="mt-2 line-clamp-2 text-xs text-muted">
-                            {staff.map((user) => staffLabel(user)).join(' · ')}
+                            {t('pointDistributors')}:{' '}
+                            {staff
+                              .filter((user) => user.role === 'dp_focal')
+                              .map((user) => staffLabel(user))
+                              .join(' · ')}
                           </p>
                         ) : (
-                          <p className="mt-2 text-xs text-muted">{t('noStaffAssigned')}</p>
+                          <p className="mt-2 text-xs text-muted">{t('noDistributorsAssigned')}</p>
                         )}
                       </div>
                       <Button type="button" size="sm" tone="sand" onClick={() => startPointEdit(dp)}>

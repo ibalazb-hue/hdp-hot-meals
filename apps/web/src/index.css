@@ -50,18 +50,35 @@ textarea {
 }
 
 #qr-reader {
-  min-height: 12rem;
+  min-height: min(68dvh, 32rem);
   flex: 1;
   border: none !important;
   background: #0a3540;
 }
 
+.scan-stage #qr-reader {
+  min-height: 100%;
+}
+
 #qr-reader video {
   width: 100% !important;
   height: 100% !important;
-  min-height: 12rem;
+  min-height: min(68dvh, 32rem);
   object-fit: cover;
   border-radius: 0;
+}
+
+.scan-stage #qr-reader video {
+  min-height: 100%;
+}
+
+#qr-reader__scan_region {
+  min-height: 100% !important;
+}
+
+#qr-reader__scan_region img,
+#qr-reader__scan_region > div {
+  max-width: none !important;
 }
 
 #qr-reader__dashboard_section,
