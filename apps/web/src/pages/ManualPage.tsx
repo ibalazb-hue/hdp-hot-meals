@@ -3,6 +3,7 @@ import { isHhCode, normalizeHhCode } from '@hdp/rules'
 import { useAuth } from '../auth'
 import { explainError } from '../errors'
 import { reasonLabel, useI18n } from '../i18n'
+import { db } from '../db'
 import { submitScan } from '../submit'
 import { SupervisorNames } from '../components/SupervisorNames'
 import { Alert, Button, Field, PageHeader, Panel, SelectInput, TextInput } from '../components/ui'
@@ -17,22 +18,27 @@ export function ManualPage() {
   const [pin, setPin] = useState('')
   const [message, setMessage] = useState('')
   const [ok, setOk] = useState(false)
+  const [members, setMembers] = useState<number | null>(null)
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
     setMessage('')
     try {
+      const code = normalizeHhCode(hh)
       const scan = await submitScan({
         mode: 'manual',
-        hhCode: normalizeHhCode(hh),
+        hhCode: code,
         dpCode: dp,
         overrideReason: reason,
         supervisorPin: pin,
       })
       setOk(scan.countsAsDistributed)
       setMessage(reasonLabel(t, scan.messageKey ?? scan.blockReason ?? 'unknown'))
+      const household = await db.households.get(code)
+      setMembers(household?.beneficiaryCount && household.beneficiaryCount > 0 ? household.beneficiaryCount : null)
     } catch (err) {
       setOk(false)
+      setMembers(null)
       setMessage(explainError(t, err))
     }
   }
@@ -63,7 +69,14 @@ export function ManualPage() {
           {t('submit')}
         </Button>
         {message ? (
-          <p className={`rounded-2xl px-4 py-3 text-xl font-bold ${ok ? 'bg-served/10 text-served' : 'bg-blocked/10 text-blocked'}`}>{message}</p>
+          <div className={`rounded-2xl px-4 py-3 ${ok ? 'bg-served/10 text-served' : 'bg-blocked/10 text-blocked'}`}>
+            <p className="text-xl font-bold">{message}</p>
+            {members != null ? (
+              <p className="mt-1 text-base font-semibold" data-testid="manual-members">
+                {t('beneficiaryCount')}: {members}
+              </p>
+            ) : null}
+          </div>
         ) : null}
       </Panel>
     </form>

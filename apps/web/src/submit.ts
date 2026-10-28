@@ -25,6 +25,7 @@ export interface BundleHousehold {
   dpCode: string
   status: 'active' | 'inactive'
   activeCardCode: string | null
+  beneficiaryCount: number
 }
 
 interface ServerScan {

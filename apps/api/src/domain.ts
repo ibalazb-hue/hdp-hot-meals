@@ -154,6 +154,7 @@ function mapHousehold(row: Row) {
     dpCode: String(row.dp_code),
     status: row.status === 'inactive' ? 'inactive' : 'active',
     activeCardCode: row.active_card_code == null ? null : String(row.active_card_code),
+    beneficiaryCount: row.beneficiary_count == null ? 0 : Number(row.beneficiary_count),
   } as const
 }
 
@@ -263,12 +264,12 @@ async function lookupHousehold(tx: Queryable, scan: IncomingScan) {
     const cardCode = scan.cardCode?.trim().toUpperCase()
     if (!cardCode) throw new HttpError(400, 'card_required')
     const active = await tx.query(
-      `SELECT hh_code, dp_code, status, active_card_code FROM households WHERE active_card_code = $1`,
+      `SELECT hh_code, dp_code, status, active_card_code, beneficiary_count FROM households WHERE active_card_code = $1`,
       [cardCode],
     )
     if (active[0]) return { household: mapHousehold(active[0]), knownVoided: false, cardCode }
     const historical = await tx.query(
-      `SELECT h.hh_code, h.dp_code, h.status, h.active_card_code
+      `SELECT h.hh_code, h.dp_code, h.status, h.active_card_code, h.beneficiary_count
        FROM card_issuance ci
        JOIN households h ON h.hh_code = ci.hh_code
        WHERE ci.card_code = $1
@@ -281,7 +282,7 @@ async function lookupHousehold(tx: Queryable, scan: IncomingScan) {
   const hhCode = scan.hhCode ? normalizeHhCode(scan.hhCode) : ''
   if (!isHhCode(hhCode)) throw new HttpError(400, 'invalid_hh')
   const rows = await tx.query(
-    `SELECT hh_code, dp_code, status, active_card_code FROM households WHERE hh_code = $1`,
+    `SELECT hh_code, dp_code, status, active_card_code, beneficiary_count FROM households WHERE hh_code = $1`,
     [hhCode],
   )
   return {
@@ -491,7 +492,7 @@ export async function syncBundle(db: Database, actor: Actor) {
     scopeCodes,
   )
   const households = await db.query(
-    `SELECT hh_code, dp_code, status, active_card_code FROM households WHERE dp_code IN (${dpsIn.sql}) ORDER BY hh_code`,
+    `SELECT hh_code, dp_code, status, active_card_code, beneficiary_count FROM households WHERE dp_code IN (${dpsIn.sql}) ORDER BY hh_code`,
     scopeCodes,
   )
   const voidedCards = await db.query(

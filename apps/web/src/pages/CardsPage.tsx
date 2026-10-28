@@ -75,7 +75,12 @@ export function CardsPage() {
                 dir="ltr"
                 onClick={() => void open(row.hhCode)}
               >
-                <span className="font-mono font-semibold">{row.hhCode}</span>
+                <span>
+                  <span className="font-mono font-semibold">{row.hhCode}</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    {t('beneficiaryCount')}: {row.beneficiaryCount}
+                  </span>
+                </span>
                 <span className={`text-xs font-bold ${row.activeCardCode ? 'text-served' : 'text-blocked'}`}>
                   {row.activeCardCode ? t('active') : t('voided')}
                 </span>
@@ -90,7 +95,11 @@ export function CardsPage() {
             {selected.hhCode}
           </p>
           <p className="text-sm text-muted">
-            {selected.dpCode} · {selected.beneficiaryCount} · {selected.label ?? '—'}
+            {selected.dpCode}
+            {selected.label ? ` · ${selected.label}` : ''}
+          </p>
+          <p className="text-base font-semibold" data-testid="hh-members">
+            {t('beneficiaryCount')}: {selected.beneficiaryCount}
           </p>
           <Field label={t('reason')}>
             <TextInput data-testid="card-reason" value={reason} onChange={(event) => setReason(event.target.value)} />
@@ -105,7 +114,7 @@ export function CardsPage() {
           </div>
           {message ? <Alert tone={tone === 'ok' ? 'ok' : 'danger'}>{message}</Alert> : null}
           {selected.payload && selected.activeCardCode ? (
-            <QrCard hhCode={selected.hhCode} payload={selected.payload} dpName={selected.dpCode} />
+            <QrCard hhCode={selected.hhCode} payload={selected.payload} dpName={selected.dpCode} beneficiaryCount={selected.beneficiaryCount} />
           ) : null}
         </Panel>
       ) : null}

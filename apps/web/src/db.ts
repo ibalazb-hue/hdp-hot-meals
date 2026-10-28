@@ -20,6 +20,7 @@ export interface LocalHousehold {
   dpCode: string
   status: 'active' | 'inactive'
   activeCardCode: string | null
+  beneficiaryCount: number
 }
 
 export interface LocalScan {

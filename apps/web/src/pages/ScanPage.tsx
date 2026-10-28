@@ -32,6 +32,7 @@ export function ScanPage() {
   const [card, setCard] = useState('')
   const [result, setResult] = useState<LocalScan | null>(null)
   const [assigned, setAssigned] = useState('')
+  const [members, setMembers] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [cameraError, setCameraError] = useState(false)
   const [reason, setReason] = useState('')
@@ -66,7 +67,11 @@ export function ScanPage() {
         const household = await db.households.get(scan.hhCode)
         const point = household ? await db.dps.get(household.dpCode) : null
         setAssigned(point ? `${point.nameEn} / ${point.nameAr}` : household?.dpCode ?? '')
-      } else setAssigned('')
+        setMembers(household?.beneficiaryCount && household.beneficiaryCount > 0 ? household.beneficiaryCount : null)
+      } else {
+        setAssigned('')
+        setMembers(null)
+      }
     } catch (err) {
       setError(explainError(t, err))
     }
@@ -138,6 +143,11 @@ export function ScanPage() {
           <p className="mt-2 text-end font-mono text-2xl" dir="ltr">
             {result.hhCode ?? result.cardCode}
           </p>
+          {members != null ? (
+            <p className="text-lg font-semibold" data-testid="scan-members">
+              {t('beneficiaryCount')}: {members}
+            </p>
+          ) : null}
           {assigned ? (
             <p>
               {t('assignedDp')}: {assigned}
@@ -177,6 +187,8 @@ export function ScanPage() {
               setCard('')
               setReason('')
               setPin('')
+              setMembers(null)
+              setAssigned('')
             }}
           >
             {t('nextHousehold')}

@@ -8,10 +8,12 @@ export function QrCard({
   hhCode,
   payload,
   dpName,
+  beneficiaryCount,
 }: {
   hhCode: string
   payload: string
   dpName: string
+  beneficiaryCount?: number | null
 }) {
   const { t } = useI18n()
   const [url, setUrl] = useState('')
@@ -31,6 +33,11 @@ export function QrCard({
         {hhCode}
       </p>
       <p className="text-sm">{dpName}</p>
+      {beneficiaryCount != null && beneficiaryCount > 0 ? (
+        <p className="mt-1 text-sm font-semibold" data-testid="card-members">
+          {t('beneficiaryCount')}: {beneficiaryCount}
+        </p>
+      ) : null}
       <p className="mt-3 text-sm font-semibold">One meal per household per day</p>
       <p className="text-sm font-semibold">وجبة واحدة لكل أسرة في اليوم</p>
       <Button className="no-print mt-4 w-full" onClick={() => window.print()}>

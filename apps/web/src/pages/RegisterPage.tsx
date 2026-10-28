@@ -79,7 +79,7 @@ export function RegisterPage() {
         <div>
           <Alert tone="ok">{t('registered')}</Alert>
           <div className="mt-3">
-            <QrCard hhCode={issued.hhCode} payload={issued.payload} dpName={point ? `${point.nameEn} / ${point.nameAr}` : issued.dpCode} />
+            <QrCard hhCode={issued.hhCode} payload={issued.payload} dpName={point ? `${point.nameEn} / ${point.nameAr}` : issued.dpCode} beneficiaryCount={issued.beneficiaryCount} />
           </div>
         </div>
       ) : null}
