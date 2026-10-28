@@ -107,10 +107,10 @@ function isUniqueViolation(error: unknown): boolean {
   return code === '23505' || message.includes('one_distribution_per_hh_day') || message.includes('duplicate key')
 }
 
-function cleanLabel(label?: string | null): string | null {
+function cleanLabel(label?: string | null, max = 80): string | null {
   if (!label) return null
   const text = label.replace(/[\r\n]+/g, ' ').trim()
-  return text ? text.slice(0, 40) : null
+  return text ? text.slice(0, max) : null
 }
 
 export function mapScan(row: Row): ScanDto {
@@ -640,6 +640,58 @@ export async function createHousehold(
   })
 }
 
+/** Reassign a household to another DP and/or edit its display name after registration.
+ *  hh_code stays fixed so cards and scan history keep working. */
+export async function updateHousehold(
+  db: Database,
+  actor: Actor,
+  hhCode: string,
+  input: { dpCode?: string; label?: string | null; beneficiaryCount?: number },
+) {
+  requireWriter(actor)
+  const code = normalizeHhCode(hhCode)
+  const hasDp = input.dpCode !== undefined
+  const hasLabel = input.label !== undefined
+  const hasCount = input.beneficiaryCount !== undefined
+  if (!hasDp && !hasLabel && !hasCount) throw new HttpError(400, 'invalid_body')
+  if (hasCount) {
+    if (!Number.isInteger(input.beneficiaryCount) || (input.beneficiaryCount as number) < 1 || (input.beneficiaryCount as number) > 30) {
+      throw new HttpError(400, 'invalid_count')
+    }
+  }
+  return db.transaction(async (tx) => {
+    const rows = await tx.query(
+      `SELECT dp_code, label, beneficiary_count, status FROM households WHERE hh_code = $1 FOR UPDATE`,
+      [code],
+    )
+    if (!rows[0]) throw new HttpError(404, 'unknown')
+    const currentDp = String(rows[0].dp_code)
+    assertDpAccess(actor, currentDp)
+    let nextDp = currentDp
+    if (hasDp) {
+      nextDp = String(input.dpCode).toUpperCase()
+      assertDpAccess(actor, nextDp)
+      if (nextDp !== currentDp) await assertActiveDp(tx, nextDp)
+    }
+    const nextLabel = hasLabel ? cleanLabel(input.label) : rows[0].label == null ? null : String(rows[0].label)
+    const nextCount = hasCount ? Number(input.beneficiaryCount) : Number(rows[0].beneficiary_count)
+    await tx.query(
+      `UPDATE households
+       SET dp_code = $2, label = $3, beneficiary_count = $4, updated_at = now()
+       WHERE hh_code = $1`,
+      [code, nextDp, nextLabel, nextCount],
+    )
+    return {
+      hhCode: code,
+      dpCode: nextDp,
+      label: nextLabel,
+      beneficiaryCount: nextCount,
+      status: String(rows[0].status),
+      previousDpCode: currentDp,
+    }
+  })
+}
+
 export async function listHouseholds(db: Database, actor: Actor, query: { q?: string; dp?: string }) {
   if (actor.role === 'dp_focal') throw new HttpError(403, 'forbidden')
   const dps = query.dp ? [query.dp.toUpperCase()] : await accessibleDpCodes(db, actor)
@@ -649,9 +701,13 @@ export async function listHouseholds(db: Database, actor: Actor, query: { q?: st
   const params: unknown[] = [...dps]
   let prefix = ''
   if (query.q?.trim()) {
-    const q = normalizeHhCode(query.q).replace(/[%_]/g, '')
+    const raw = query.q.trim()
+    const q = normalizeHhCode(raw).replace(/[%_]/g, '')
     params.push(`${q}%`)
-    prefix = ` AND hh_code LIKE $${params.length}`
+    const hhParam = params.length
+    params.push(`%${raw.replace(/[%_]/g, '')}%`)
+    const labelParam = params.length
+    prefix = ` AND (hh_code LIKE $${hhParam} OR COALESCE(label, '') ILIKE $${labelParam})`
   }
   const rows = await db.query(
     `SELECT hh_code, dp_code, beneficiary_count, label, status, active_card_code

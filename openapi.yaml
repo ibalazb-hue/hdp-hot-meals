@@ -152,6 +152,29 @@ paths:
         '201':
           description: Household and new card payload
   /api/households/{hhCode}:
+    patch:
+      summary: Update household point (DP), name/label, or member count after registration
+      description: hh_code stays immutable. Meal and admin only. Requires access to current and new DP.
+      parameters:
+        - in: path
+          name: hhCode
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dpCode: { type: string }
+                label: { type: string, nullable: true, maxLength: 80 }
+                beneficiaryCount: { type: integer, minimum: 1, maximum: 30 }
+      responses:
+        '200': { description: Updated household }
+        '400': { description: Invalid body }
+        '403': { description: Forbidden }
+        '404': { description: Unknown household }
     get:
       tags: [Households]
       security: [{ bearer: [] }]

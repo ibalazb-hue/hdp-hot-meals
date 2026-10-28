@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { normalizeHhCode } from '@hdp/rules'
 import { apiJson } from '../api'
 import { explainError } from '../errors'
 import { QrCard } from '../components/QrCard'
-import { Alert, Button, EmptyState, Field, PageHeader, Panel, TextInput } from '../components/ui'
+import { Alert, Button, EmptyState, Field, PageHeader, Panel, SelectInput, TextInput } from '../components/ui'
 import { useI18n } from '../i18n'
 
 interface Household {
@@ -16,15 +16,32 @@ interface Household {
   payload: string | null
 }
 
+interface DpOption {
+  code: string
+  nameEn: string
+  nameAr: string
+}
+
 export function CardsPage() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const [query, setQuery] = useState('')
   const [rows, setRows] = useState<Household[]>([])
   const [selected, setSelected] = useState<Household | null>(null)
+  const [dps, setDps] = useState<DpOption[]>([])
+  const [editDp, setEditDp] = useState('')
+  const [editLabel, setEditLabel] = useState('')
+  const [editCount, setEditCount] = useState('1')
+  const [saving, setSaving] = useState(false)
   const [reason, setReason] = useState('')
   const [message, setMessage] = useState('')
   const [tone, setTone] = useState<'ok' | 'danger'>('ok')
   const [searched, setSearched] = useState(false)
+
+  useEffect(() => {
+    void apiJson<DpOption[]>('/api/dps')
+      .then(setDps)
+      .catch(() => setDps([]))
+  }, [])
 
   async function search() {
     const list = await apiJson<Household[]>(`/api/households?q=${encodeURIComponent(query)}`)
@@ -33,8 +50,42 @@ export function CardsPage() {
   }
 
   async function open(hhCode: string) {
-    setSelected(await apiJson<Household>(`/api/households/${encodeURIComponent(hhCode)}`))
+    const hh = await apiJson<Household>(`/api/households/${encodeURIComponent(hhCode)}`)
+    setSelected(hh)
+    setEditDp(hh.dpCode)
+    setEditLabel(hh.label ?? '')
+    setEditCount(String(hh.beneficiaryCount || 1))
     setMessage('')
+  }
+
+  async function saveDetails() {
+    if (!selected) return
+    const count = Number(editCount)
+    if (!Number.isInteger(count) || count < 1 || count > 30) {
+      setTone('danger')
+      setMessage(t('invalid_count'))
+      return
+    }
+    setSaving(true)
+    try {
+      await apiJson(`/api/households/${encodeURIComponent(selected.hhCode)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          dpCode: editDp,
+          label: editLabel.trim() ? editLabel.trim() : null,
+          beneficiaryCount: count,
+        }),
+      })
+      setTone('ok')
+      setMessage(t('householdSaved'))
+      await open(selected.hhCode)
+      if (searched) await search()
+    } catch (err) {
+      setTone('danger')
+      setMessage(explainError(t, err))
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function act(kind: 'void' | 'reissue') {
@@ -50,17 +101,23 @@ export function CardsPage() {
     }
   }
 
+  const dirty =
+    selected &&
+    (editDp !== selected.dpCode ||
+      (editLabel.trim() || '') !== (selected.label ?? '') ||
+      Number(editCount) !== selected.beneficiaryCount)
+
   return (
     <div className="grid gap-4">
       <PageHeader title={t('cards')} subtitle={t('tileCards')} />
       <Panel className="grid gap-3">
-        <Field label={t('search')}>
-          <TextInput data-testid="card-search" dir="ltr" value={query} onChange={(event) => setQuery(event.target.value.toUpperCase())} />
+        <Field label={t('search')} hint={t('householdSearchHint')}>
+          <TextInput data-testid="card-search" dir="ltr" value={query} onChange={(event) => setQuery(event.target.value)} />
         </Field>
         <Button
           type="button"
           onClick={() => {
-            setQuery(normalizeHhCode(query))
+            setQuery((current) => (/[a-z]/i.test(current) && !/\s/.test(current) ? normalizeHhCode(current) : current))
             void search()
           }}
         >
@@ -78,7 +135,8 @@ export function CardsPage() {
                 <span>
                   <span className="font-mono font-semibold">{row.hhCode}</span>
                   <span className="mt-0.5 block text-xs text-muted">
-                    {t('beneficiaryCount')}: {row.beneficiaryCount}
+                    {row.dpCode}
+                    {row.label ? ` · ${row.label}` : ''} · {t('beneficiaryCount')}: {row.beneficiaryCount}
                   </span>
                 </span>
                 <span className={`text-xs font-bold ${row.activeCardCode ? 'text-served' : 'text-blocked'}`}>
@@ -94,13 +152,40 @@ export function CardsPage() {
           <p className="font-mono text-xl font-bold" dir="ltr">
             {selected.hhCode}
           </p>
-          <p className="text-sm text-muted">
-            {selected.dpCode}
-            {selected.label ? ` · ${selected.label}` : ''}
-          </p>
-          <p className="text-base font-semibold" data-testid="hh-members">
-            {t('beneficiaryCount')}: {selected.beneficiaryCount}
-          </p>
+          <p className="text-xs text-muted">{t('hhCodeFixedHint')}</p>
+          <Field label={t('assignedDp')} hint={t('reassignDpHint')}>
+            <SelectInput data-testid="hh-dp" value={editDp} onChange={(event) => setEditDp(event.target.value)}>
+              {dps.map((dp) => (
+                <option key={dp.code} value={dp.code}>
+                  {dp.code} — {locale === 'ar' ? dp.nameAr : dp.nameEn}
+                </option>
+              ))}
+              {!dps.some((dp) => dp.code === editDp) && editDp ? (
+                <option value={editDp}>{editDp}</option>
+              ) : null}
+            </SelectInput>
+          </Field>
+          <Field label={t('householdName')}>
+            <TextInput
+              data-testid="hh-label"
+              value={editLabel}
+              maxLength={80}
+              onChange={(event) => setEditLabel(event.target.value)}
+              placeholder={t('householdNameHint')}
+            />
+          </Field>
+          <Field label={t('beneficiaryCount')}>
+            <TextInput
+              data-testid="hh-count"
+              dir="ltr"
+              inputMode="numeric"
+              value={editCount}
+              onChange={(event) => setEditCount(event.target.value.replace(/[^\d]/g, '').slice(0, 2))}
+            />
+          </Field>
+          <Button data-testid="save-household" type="button" disabled={!dirty || saving || !editDp} onClick={() => void saveDetails()}>
+            {saving ? t('loading') : t('saveHousehold')}
+          </Button>
           <Field label={t('reason')}>
             <TextInput data-testid="card-reason" value={reason} onChange={(event) => setReason(event.target.value)} />
           </Field>

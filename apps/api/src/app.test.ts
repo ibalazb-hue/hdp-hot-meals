@@ -551,3 +551,85 @@ describe('admin distribution points', () => {
     expect(still.latitude).toBeCloseTo(13.6)
   })
 })
+
+describe('household edit', () => {
+  it('lets meal reassign a household to another DP and rename it without changing hh_code', async () => {
+    const meal = await login('meal.taiz')
+    const created = await app.request('/api/households', {
+      method: 'POST',
+      headers: auth(meal.token),
+      body: JSON.stringify({ dpCode: 'MDF01', beneficiaryCount: 5, label: 'Old Name' }),
+    })
+    expect(created.status).toBe(201)
+    const hh = (await created.json()) as { hhCode: string; cardCode: string; dpCode: string; label: string | null }
+    expect(hh.dpCode).toBe('MDF01')
+    expect(hh.hhCode.startsWith('TZ-MDF01-')).toBe(true)
+
+    const patched = await app.request(`/api/households/${hh.hhCode}`, {
+      method: 'PATCH',
+      headers: auth(meal.token),
+      body: JSON.stringify({ dpCode: 'MDF02', label: 'New Family', beneficiaryCount: 7 }),
+    })
+    expect(patched.status).toBe(200)
+    const body = (await patched.json()) as {
+      hhCode: string
+      dpCode: string
+      label: string | null
+      beneficiaryCount: number
+      previousDpCode: string
+    }
+    expect(body.hhCode).toBe(hh.hhCode)
+    expect(body.dpCode).toBe('MDF02')
+    expect(body.previousDpCode).toBe('MDF01')
+    expect(body.label).toBe('New Family')
+    expect(body.beneficiaryCount).toBe(7)
+
+    const got = await app.request(`/api/households/${hh.hhCode}`, { headers: auth(meal.token) })
+    const detail = (await got.json()) as { hhCode: string; dpCode: string; label: string | null; beneficiaryCount: number }
+    expect(detail.hhCode).toBe(hh.hhCode)
+    expect(detail.dpCode).toBe('MDF02')
+    expect(detail.label).toBe('New Family')
+    expect(detail.beneficiaryCount).toBe(7)
+
+    const byName = await app.request('/api/households?q=New%20Family', { headers: auth(meal.token) })
+    const list = (await byName.json()) as Array<{ hhCode: string }>
+    expect(list.some((row) => row.hhCode === hh.hhCode)).toBe(true)
+
+    // Scan at the new point should serve; old point should be wrong_dp.
+    const focalNew = await login('focal.mudhaffar') // has MDF01 and MDF02
+    const atNew = await postScan(
+      focalNew.token,
+      scan(focalNew.user.id, { cardCode: hh.cardCode, dpCode: 'MDF02', deviceId: 'tablet-reassign-1' }),
+    )
+    expect(atNew.status).toBe(200)
+    expect(atNew.json.scan?.result).toBe('Served')
+
+    const meal2 = await login('meal.taiz')
+    const created2 = await app.request('/api/households', {
+      method: 'POST',
+      headers: auth(meal2.token),
+      body: JSON.stringify({ dpCode: 'MDF01', beneficiaryCount: 3, label: 'Move Block' }),
+    })
+    const hh2 = (await created2.json()) as { hhCode: string; cardCode: string }
+    const wrong = await postScan(
+      focalNew.token,
+      scan(focalNew.user.id, {
+        cardCode: hh2.cardCode,
+        dpCode: 'MDF02',
+        deviceId: 'tablet-reassign-2',
+        scannedAt: new Date(Date.now() + 2_000).toISOString(),
+      }),
+    )
+    expect(wrong.json.scan?.blockReason).toBe('wrong_dp')
+  })
+
+  it('forbids focals from editing households', async () => {
+    const focal = await login('focal.mudhaffar')
+    const response = await app.request('/api/households/TZ-MDF01-000101', {
+      method: 'PATCH',
+      headers: auth(focal.token),
+      body: JSON.stringify({ label: 'Nope' }),
+    })
+    expect(response.status).toBe(403)
+  })
+})

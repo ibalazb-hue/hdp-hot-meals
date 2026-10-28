@@ -67,7 +67,7 @@ export function RegisterPage() {
             <TextInput data-testid="register-count" inputMode="numeric" value={count} onChange={(event) => setCount(event.target.value)} />
           </Field>
           <Field label={t('label')}>
-            <TextInput value={label} onChange={(event) => setLabel(event.target.value)} maxLength={40} />
+            <TextInput value={label} onChange={(event) => setLabel(event.target.value)} maxLength={80} />
           </Field>
           <Button data-testid="register-submit" type="submit" size="lg">
             {t('register')}

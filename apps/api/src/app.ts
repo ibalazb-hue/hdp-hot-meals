@@ -10,6 +10,7 @@ import {
   applyScans,
   createDp,
   createHousehold,
+  updateHousehold,
   createSpotCheck,
   createUser,
   dashboard,
@@ -133,13 +134,28 @@ export function createApp(db: Database, options?: { distDir?: string }) {
       z.object({
         dpCode: z.string().min(2).max(8),
         beneficiaryCount: z.number().int().min(1).max(30),
-        label: z.string().max(40).nullish(),
+        label: z.string().max(80).nullish(),
       }),
       await c.req.json(),
     )
     return c.json(await createHousehold(db, c.get('actor'), body), 201)
   })
   app.get('/api/households/:hhCode', async (c) => c.json(await getHousehold(db, c.get('actor'), c.req.param('hhCode'))))
+  app.patch('/api/households/:hhCode', async (c) => {
+    const body = parse(
+      z
+        .object({
+          dpCode: z.string().min(2).max(8).optional(),
+          label: z.string().max(80).nullish(),
+          beneficiaryCount: z.number().int().min(1).max(30).optional(),
+        })
+        .refine((value) => value.dpCode !== undefined || value.label !== undefined || value.beneficiaryCount !== undefined, {
+          message: 'empty',
+        }),
+      await c.req.json(),
+    )
+    return c.json(await updateHousehold(db, c.get('actor'), c.req.param('hhCode'), body))
+  })
   app.post('/api/households/:hhCode/void', async (c) => {
     const body = parse(z.object({ reason: z.string().min(3).max(300) }), await c.req.json())
     return c.json(await voidCard(db, c.get('actor'), c.req.param('hhCode'), body.reason))
