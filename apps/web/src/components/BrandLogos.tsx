@@ -35,23 +35,32 @@ function LogoImg({
 /** HDP + WFP logos for screen and print. Optional overrides from Admin card template. */
 export function BrandLogos({
   className = 'h-10',
+  layout = 'inline',
   showWfp = true,
   showHdp = true,
   wfpSrc,
   hdpSrc,
 }: {
   className?: string
+  /** inline = side-by-side; spread = one logo left, one logo right (full width) */
+  layout?: 'inline' | 'spread'
   showWfp?: boolean
   showHdp?: boolean
   wfpSrc?: string | null
   hdpSrc?: string | null
 }) {
   if (!showWfp && !showHdp) return null
+  const wrap =
+    layout === 'spread'
+      ? 'flex w-full items-center justify-between gap-3'
+      : 'inline-flex items-center gap-2'
   return (
-    <span className="inline-flex items-center gap-2">
+    <span className={wrap}>
       {showWfp ? (
         <LogoImg src={wfpSrc || '/logos/wfp.png'} alt="WFP" fallback="WFP logo" className={className} />
-      ) : null}
+      ) : (
+        layout === 'spread' ? <span aria-hidden className="h-1 w-1" /> : null
+      )}
       {showHdp ? (
         <LogoImg
           src={hdpSrc || '/logos/hdp.png'}
@@ -59,7 +68,9 @@ export function BrandLogos({
           fallback="HDP logo"
           className={className}
         />
-      ) : null}
+      ) : (
+        layout === 'spread' ? <span aria-hidden className="h-1 w-1" /> : null
+      )}
     </span>
   )
 }

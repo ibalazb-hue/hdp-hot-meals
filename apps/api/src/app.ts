@@ -298,6 +298,8 @@ export function createApp(db: Database, options?: { distDir?: string }) {
         rulesText: z.string().max(2000).optional(),
         freeLineEn: z.string().max(200).optional(),
         freeLineAr: z.string().max(200).optional(),
+        complaintsHeadingAr: z.string().max(120).optional(),
+        hotlineHeadingAr: z.string().max(80).optional(),
         wfpHotline: z.string().max(80).optional(),
         hdpHotline: z.string().max(80).optional(),
         validFrom: z.string().max(40).optional(),

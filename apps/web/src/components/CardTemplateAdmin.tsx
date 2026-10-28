@@ -15,6 +15,8 @@ export interface CardTemplateForm {
   rulesText: string
   freeLineEn: string
   freeLineAr: string
+  complaintsHeadingAr: string
+  hotlineHeadingAr: string
   wfpHotline: string
   hdpHotline: string
   validFrom: string
@@ -158,6 +160,12 @@ export function CardTemplateAdmin() {
           <Field label={t('freeLineAr')}>
             <TextInput dir="rtl" value={form.freeLineAr} maxLength={200} onChange={(e) => patch('freeLineAr', e.target.value)} />
           </Field>
+          <Field label={t('complaintsHeadingAr')}>
+            <TextInput dir="rtl" value={form.complaintsHeadingAr} maxLength={120} onChange={(e) => patch('complaintsHeadingAr', e.target.value)} />
+          </Field>
+          <Field label={t('hotlineHeadingAr')}>
+            <TextInput dir="rtl" value={form.hotlineHeadingAr} maxLength={80} onChange={(e) => patch('hotlineHeadingAr', e.target.value)} />
+          </Field>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label={t('wfpHotline')}>
               <TextInput dir="ltr" value={form.wfpHotline} maxLength={80} onChange={(e) => patch('wfpHotline', e.target.value)} />
@@ -215,6 +223,8 @@ export function CardTemplateAdmin() {
           rulesText={form.rulesText}
           freeLineEn={form.freeLineEn}
           freeLineAr={form.freeLineAr}
+          complaintsHeadingAr={form.complaintsHeadingAr}
+          hotlineHeadingAr={form.hotlineHeadingAr}
           wfpHotline={form.wfpHotline}
           hdpHotline={form.hdpHotline}
           validFrom={form.validFrom || '2026-01-01'}

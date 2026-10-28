@@ -31,6 +31,8 @@ interface Issued {
   rulesText?: string | null
   freeLineEn?: string | null
   freeLineAr?: string | null
+  complaintsHeadingAr?: string | null
+  hotlineHeadingAr?: string | null
   showSerial?: boolean
   showBatch?: boolean
 }
@@ -122,6 +124,8 @@ export function RegisterPage() {
               rulesText={issued.rulesText}
               freeLineEn={issued.freeLineEn}
               freeLineAr={issued.freeLineAr}
+              complaintsHeadingAr={issued.complaintsHeadingAr}
+              hotlineHeadingAr={issued.hotlineHeadingAr}
               showSerial={issued.showSerial}
               showBatch={issued.showBatch}
             />

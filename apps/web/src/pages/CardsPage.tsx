@@ -32,6 +32,8 @@ interface Household {
   rulesText?: string | null
   freeLineEn?: string | null
   freeLineAr?: string | null
+  complaintsHeadingAr?: string | null
+  hotlineHeadingAr?: string | null
   showSerial?: boolean
   showBatch?: boolean
 }
@@ -241,6 +243,8 @@ export function CardsPage() {
               rulesText={selected.rulesText}
               freeLineEn={selected.freeLineEn}
               freeLineAr={selected.freeLineAr}
+              complaintsHeadingAr={selected.complaintsHeadingAr}
+              hotlineHeadingAr={selected.hotlineHeadingAr}
               showSerial={selected.showSerial}
               showBatch={selected.showBatch}
             />

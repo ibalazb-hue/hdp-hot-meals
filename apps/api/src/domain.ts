@@ -611,6 +611,8 @@ export interface CardTemplate {
   rulesText: string
   freeLineEn: string
   freeLineAr: string
+  complaintsHeadingAr: string
+  hotlineHeadingAr: string
   wfpHotline: string
   hdpHotline: string
   validFrom: string
@@ -636,6 +638,8 @@ export function defaultCardTemplate(): CardTemplate {
       'One meal per household per day.\nThis card is personal and not for sale.\nReport loss at the help desk.',
     freeLineEn: 'Assistance is FREE – do not pay anyone.',
     freeLineAr: 'المساعدة مجانية — لا تدفع لأي شخص',
+    complaintsHeadingAr: 'المقترحات والشكاوى',
+    hotlineHeadingAr: 'الخط الساخن',
     wfpHotline: process.env.WFP_HOTLINE?.trim() || '',
     hdpHotline: process.env.HDP_HOTLINE?.trim() || '',
     validFrom: process.env.CARD_VALID_FROM?.trim() || '',
@@ -672,6 +676,8 @@ export function normalizeCardTemplate(input: Partial<CardTemplate> | null | unde
     rulesText: rules.replace(/\r\n/g, '\n').trim().slice(0, 2000) || base.rulesText,
     freeLineEn: (input.freeLineEn != null ? String(input.freeLineEn) : base.freeLineEn).trim().slice(0, 200) || base.freeLineEn,
     freeLineAr: (input.freeLineAr != null ? String(input.freeLineAr) : base.freeLineAr).trim().slice(0, 200) || base.freeLineAr,
+    complaintsHeadingAr: (input.complaintsHeadingAr != null ? String(input.complaintsHeadingAr) : base.complaintsHeadingAr).trim().slice(0, 120) || base.complaintsHeadingAr,
+    hotlineHeadingAr: (input.hotlineHeadingAr != null ? String(input.hotlineHeadingAr) : base.hotlineHeadingAr).trim().slice(0, 80) || base.hotlineHeadingAr,
     wfpHotline: (input.wfpHotline != null ? String(input.wfpHotline) : base.wfpHotline).trim().slice(0, 80),
     hdpHotline: (input.hdpHotline != null ? String(input.hdpHotline) : base.hdpHotline).trim().slice(0, 80),
     validFrom: (input.validFrom != null ? String(input.validFrom) : base.validFrom).trim().slice(0, 40),
@@ -727,6 +733,8 @@ function cardPrintFields(template: CardTemplate, cardCode: string | null, issued
     rulesText: template.rulesText,
     freeLineEn: template.freeLineEn,
     freeLineAr: template.freeLineAr,
+    complaintsHeadingAr: template.complaintsHeadingAr,
+    hotlineHeadingAr: template.hotlineHeadingAr,
     wfpHotline: template.wfpHotline || null,
     hdpHotline: template.hdpHotline || null,
     validFrom: template.validFrom || createdDay,
