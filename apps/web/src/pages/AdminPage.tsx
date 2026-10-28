@@ -29,6 +29,10 @@ interface DpRow {
   nameAr: string
   district: string
   active: boolean
+  latitude?: number | null
+  longitude?: number | null
+  gpsRadiusM?: number
+  gpsCheckActive?: boolean
   householdCount?: number
   assignedUsers?: AssignedUser[]
 }
@@ -56,6 +60,10 @@ interface DpEdit {
   nameAr: string
   district: string
   active: boolean
+  latitude: string
+  longitude: string
+  gpsRadiusM: string
+  gpsCheckActive: boolean
   userIds: string[]
 }
 
@@ -86,7 +94,17 @@ export function AdminPage() {
   const [form, setForm] = useState({ username: '', displayName: '', password: '', role: 'dp_focal', dpCodes: '', pin: '' })
   const [editing, setEditing] = useState<EditForm | null>(null)
   const [editingPoint, setEditingPoint] = useState<DpEdit | null>(null)
-  const [point, setPoint] = useState({ code: '', nameEn: '', nameAr: '', district: 'Al-Mudhaffar', active: true })
+  const [point, setPoint] = useState({
+    code: '',
+    nameEn: '',
+    nameAr: '',
+    district: 'Al-Mudhaffar',
+    active: true,
+    latitude: '',
+    longitude: '',
+    gpsRadiusM: '150',
+    gpsCheckActive: false,
+  })
   const [showCreatePoint, setShowCreatePoint] = useState(false)
   const [pointQuery, setPointQuery] = useState('')
   const [districtFilter, setDistrictFilter] = useState('all')
@@ -259,6 +277,36 @@ export function AdminPage() {
     return t('districtMudhaffar')
   }
 
+
+  function parseGpsFields(fields: { latitude: string; longitude: string; gpsRadiusM: string; gpsCheckActive: boolean }) {
+    const latRaw = fields.latitude.trim()
+    const lngRaw = fields.longitude.trim()
+    const latitude = latRaw === '' ? null : Number(latRaw)
+    const longitude = lngRaw === '' ? null : Number(lngRaw)
+    const gpsRadiusM = Number(fields.gpsRadiusM || '150')
+    if ((latitude == null) !== (longitude == null)) {
+      flash(t('invalid_location'), 'danger')
+      return null
+    }
+    if (latitude != null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) {
+      flash(t('invalid_location'), 'danger')
+      return null
+    }
+    if (longitude != null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180)) {
+      flash(t('invalid_location'), 'danger')
+      return null
+    }
+    if (!Number.isFinite(gpsRadiusM) || gpsRadiusM < 10 || gpsRadiusM > 5000) {
+      flash(t('invalid_gps_radius'), 'danger')
+      return null
+    }
+    if (fields.gpsCheckActive && (latitude == null || longitude == null)) {
+      flash(t('gps_point_required'), 'danger')
+      return null
+    }
+    return { latitude, longitude, gpsRadiusM, gpsCheckActive: fields.gpsCheckActive }
+  }
+
   function startPointEdit(dp: DpRow) {
     setEditingPoint({
       code: dp.code,
@@ -266,6 +314,10 @@ export function AdminPage() {
       nameAr: dp.nameAr,
       district: dp.district,
       active: dp.active,
+      latitude: dp.latitude == null ? '' : String(dp.latitude),
+      longitude: dp.longitude == null ? '' : String(dp.longitude),
+      gpsRadiusM: String(dp.gpsRadiusM ?? 150),
+      gpsCheckActive: Boolean(dp.gpsCheckActive),
       userIds: (dp.assignedUsers ?? []).map((user) => user.id),
     })
     setShowCreatePoint(false)
@@ -298,6 +350,8 @@ export function AdminPage() {
       flash(t('invalid_body'), 'danger')
       return
     }
+    const gps = parseGpsFields(point)
+    if (!gps) return
     try {
       await apiJson('/api/admin/dps', {
         method: 'POST',
@@ -307,10 +361,21 @@ export function AdminPage() {
           nameAr: point.nameAr.trim(),
           district: point.district,
           active: point.active,
+          ...gps,
         }),
       })
       flash(t('dpCreated'))
-      setPoint({ code: '', nameEn: '', nameAr: '', district: 'Al-Mudhaffar', active: true })
+      setPoint({
+        code: '',
+        nameEn: '',
+        nameAr: '',
+        district: 'Al-Mudhaffar',
+        active: true,
+        latitude: '',
+        longitude: '',
+        gpsRadiusM: '150',
+        gpsCheckActive: false,
+      })
       setShowCreatePoint(false)
       reload()
     } catch (error) {
@@ -325,6 +390,8 @@ export function AdminPage() {
       flash(t('invalid_body'), 'danger')
       return
     }
+    const gps = parseGpsFields(editingPoint)
+    if (!gps) return
     try {
       await apiJson(`/api/admin/dps/${editingPoint.code}`, {
         method: 'PATCH',
@@ -334,6 +401,7 @@ export function AdminPage() {
           district: editingPoint.district,
           active: editingPoint.active,
           userIds: editingPoint.userIds,
+          ...gps,
         }),
       })
       setEditingPoint(null)
@@ -662,6 +730,52 @@ export function AdminPage() {
                   <input id="create-dp-active" type="checkbox" checked={point.active} onChange={(event) => setPoint({ ...point, active: event.target.checked })} />
                   {t('active')} — {t('pointActiveHint')}
                 </label>
+                <div className="grid gap-3 rounded-2xl border border-line bg-white/70 p-3">
+                  <div>
+                    <h4 className="font-bold text-teal">{t('gpsSection')}</h4>
+                    <p className="mt-1 text-xs text-muted">{t('gpsCheckHint')}</p>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <Field label={t('latitude')}>
+                      <TextInput
+                        id="create-dp-lat"
+                        dir="ltr"
+                        inputMode="decimal"
+                        value={point.latitude}
+                        onChange={(event) => setPoint({ ...point, latitude: event.target.value })}
+                        placeholder="13.57952"
+                      />
+                    </Field>
+                    <Field label={t('longitude')}>
+                      <TextInput
+                        id="create-dp-lng"
+                        dir="ltr"
+                        inputMode="decimal"
+                        value={point.longitude}
+                        onChange={(event) => setPoint({ ...point, longitude: event.target.value })}
+                        placeholder="44.02091"
+                      />
+                    </Field>
+                    <Field label={t('gpsRadiusM')} hint={t('gpsRadiusHint')}>
+                      <TextInput
+                        id="create-dp-radius"
+                        dir="ltr"
+                        inputMode="numeric"
+                        value={point.gpsRadiusM}
+                        onChange={(event) => setPoint({ ...point, gpsRadiusM: event.target.value })}
+                      />
+                    </Field>
+                  </div>
+                  <label className="flex min-h-12 items-center gap-2 font-semibold">
+                    <input
+                      id="create-dp-gps-check"
+                      type="checkbox"
+                      checked={point.gpsCheckActive}
+                      onChange={(event) => setPoint({ ...point, gpsCheckActive: event.target.checked })}
+                    />
+                    {t('gpsCheckActive')}
+                  </label>
+                </div>
                 <Button type="submit">{t('create')}</Button>
               </form>
             ) : null}
@@ -707,6 +821,50 @@ export function AdminPage() {
                   />
                   {t('active')} — {t('pointActiveHint')}
                 </label>
+                <div className="grid gap-3 rounded-2xl border border-line bg-mist/40 p-3">
+                  <div>
+                    <h4 className="font-bold text-teal">{t('gpsSection')}</h4>
+                    <p className="mt-1 text-xs text-muted">{t('gpsCheckHint')}</p>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <Field label={t('latitude')}>
+                      <TextInput
+                        id="edit-dp-lat"
+                        dir="ltr"
+                        inputMode="decimal"
+                        value={editingPoint.latitude}
+                        onChange={(event) => setEditingPoint({ ...editingPoint, latitude: event.target.value })}
+                      />
+                    </Field>
+                    <Field label={t('longitude')}>
+                      <TextInput
+                        id="edit-dp-lng"
+                        dir="ltr"
+                        inputMode="decimal"
+                        value={editingPoint.longitude}
+                        onChange={(event) => setEditingPoint({ ...editingPoint, longitude: event.target.value })}
+                      />
+                    </Field>
+                    <Field label={t('gpsRadiusM')} hint={t('gpsRadiusHint')}>
+                      <TextInput
+                        id="edit-dp-radius"
+                        dir="ltr"
+                        inputMode="numeric"
+                        value={editingPoint.gpsRadiusM}
+                        onChange={(event) => setEditingPoint({ ...editingPoint, gpsRadiusM: event.target.value })}
+                      />
+                    </Field>
+                  </div>
+                  <label className="flex min-h-12 items-center gap-2 font-semibold">
+                    <input
+                      id="edit-dp-gps-check"
+                      type="checkbox"
+                      checked={editingPoint.gpsCheckActive}
+                      onChange={(event) => setEditingPoint({ ...editingPoint, gpsCheckActive: event.target.checked })}
+                    />
+                    {t('gpsCheckActive')}
+                  </label>
+                </div>
                 <Field label={t('staffAtPoint')} hint={t('staffAtPointHint')}>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {users.map((user) => {
@@ -783,7 +941,18 @@ export function AdminPage() {
                           <span className="rounded-full bg-mist px-2.5 py-1">
                             {t('staffShort')}: <span className="tabular text-ink">{staff.length}</span>
                           </span>
+                          <span className={`rounded-full px-2.5 py-1 ${dp.gpsCheckActive ? 'bg-teal/15 text-teal' : 'bg-mist'}`}>
+                            {dp.gpsCheckActive ? t('gpsOn') : t('gpsOff')}
+                            {dp.latitude != null && dp.longitude != null
+                              ? ` · ${Number(dp.gpsRadiusM ?? 150)} m`
+                              : ` · ${t('gpsUnset')}`}
+                          </span>
                         </div>
+                        {dp.latitude != null && dp.longitude != null ? (
+                          <p className="mt-1 font-mono text-xs text-muted" dir="ltr">
+                            {Number(dp.latitude).toFixed(5)}, {Number(dp.longitude).toFixed(5)}
+                          </p>
+                        ) : null}
                         {staff.length > 0 ? (
                           <p className="mt-2 line-clamp-2 text-xs text-muted">
                             {staff.map((user) => staffLabel(user)).join(' · ')}

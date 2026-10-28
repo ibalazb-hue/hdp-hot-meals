@@ -27,7 +27,7 @@ export const en = {
   sop: 'Field steps',
   syncNow: 'Sync',
   syncing: 'Syncing…',
-  lastSync: 'List updated',
+  lastSync: 'Last sync',
   neverSynced: 'No household list on this tablet yet',
   servedToday: 'Served today',
   blockedToday: 'Blocked today',
@@ -42,13 +42,13 @@ export const en = {
   pin: 'Supervisor PIN',
   submit: 'Check and record',
   served: 'Served',
-  already_served: 'Already received today',
-  voided: 'Card voided',
-  wrong_dp: 'Wrong distribution point',
-  unknown: 'Code not recognised',
-  inactive: 'Household inactive',
-  no_card: 'No active card',
-  duplicate_conflict: 'Already received today',
+  already_served: 'Already received a meal today — do not serve again.',
+  voided: 'This card was voided. Ask MEAL to reissue before serving.',
+  wrong_dp: 'Wrong distribution point — this household belongs to another point.',
+  unknown: 'Code not recognised on this tablet. Sync the list, then try again.',
+  inactive: 'Household is inactive and cannot be served.',
+  no_card: 'No active card for this household. Register or reissue a card first.',
+  duplicate_conflict: 'Already counted on another device today — do not serve again.',
   override: 'Supervisor override',
   manual_exception: 'Manual exception',
   noCache: 'Sync the household list before working offline.',
@@ -210,7 +210,7 @@ export const en = {
   tileAdmin: 'Users, roles, and distribution points',
   tileSop: 'Field steps for the team',
   pinShared: 'Supervisor PIN',
-  pointsSubtitle: 'Create points, edit names and district, activate or pause, and assign staff.',
+  pointsSubtitle: 'Create points, edit names, GPS fence, activate or pause, and assign staff.',
   createPoint: 'Add point',
   editPoint: 'Edit distribution point',
   searchPoints: 'Search code or name',
@@ -224,6 +224,22 @@ export const en = {
   householdsShort: 'Households',
   staffShort: 'Staff',
   noStaffAssigned: 'No staff assigned yet',
+  out_of_geofence: 'Outside the allowed GPS radius for this point. Move closer or ask admin to widen the fence.',
+  location_required: 'GPS check is on for this point, but the tablet has no location. Enable location services and try again.',
+  other: 'Blocked for another reason.',
+  gpsSection: 'GPS fence',
+  gpsCheckActive: 'Enforce GPS check',
+  gpsCheckHint: 'When on, scans outside the radius (or with no fix) are blocked. Latitude and longitude are always saved when available.',
+  latitude: 'Latitude',
+  longitude: 'Longitude',
+  gpsRadiusM: 'Allowed radius (metres)',
+  gpsRadiusHint: '10–5000 metres. Default 150.',
+  gpsUnset: 'No GPS point set',
+  gpsOn: 'GPS check on',
+  gpsOff: 'GPS check off',
+  invalid_gps_radius: 'Allowed radius must be between 10 and 5000 metres.',
+  gps_point_required: 'Turn on GPS check only after you set latitude and longitude for this point.',
+  rejectDetail: 'Why it was rejected',
 }
 
 const ar: Record<keyof typeof en, string> = {
@@ -253,7 +269,7 @@ const ar: Record<keyof typeof en, string> = {
   sop: 'خطوات الميدان',
   syncNow: 'مزامنة',
   syncing: 'جارٍ المزامنة…',
-  lastSync: 'آخر تحديث للقائمة',
+  lastSync: 'آخر مزامنة',
   neverSynced: 'لا توجد قائمة أسر على هذا الجهاز بعد',
   servedToday: 'صُرف اليوم',
   blockedToday: 'مرفوض اليوم',
@@ -268,13 +284,13 @@ const ar: Record<keyof typeof en, string> = {
   pin: 'رمز المشرف',
   submit: 'تحقق وسجّل',
   served: 'تم تقديم الوجبة',
-  already_served: 'تم استلام الوجبة اليوم',
-  voided: 'البطاقة ملغاة',
-  wrong_dp: 'نقطة توزيع غير مخصصة',
-  unknown: 'الرمز غير معروف',
-  inactive: 'الأسرة موقوفة',
-  no_card: 'لا توجد بطاقة سارية',
-  duplicate_conflict: 'تم استلام الوجبة اليوم',
+  already_served: 'تم استلام وجبة اليوم — لا تصرف مرة أخرى.',
+  voided: 'هذه البطاقة ملغاة. اطلب من المتابعة إصدار بديل قبل الصرف.',
+  wrong_dp: 'نقطة توزيع خاطئة — هذه الأسرة تابعة لنقطة أخرى.',
+  unknown: 'الرمز غير معروف على هذا الجهاز. زامن القائمة ثم أعد المحاولة.',
+  inactive: 'الأسرة موقوفة ولا يمكن صرف وجبة لها.',
+  no_card: 'لا توجد بطاقة سارية لهذه الأسرة. سجّل أو أصدر بطاقة بديلة أولاً.',
+  duplicate_conflict: 'حُسبت الوجبة على جهاز آخر اليوم — لا تصرف مرة أخرى.',
   override: 'تجاوز المشرف',
   manual_exception: 'استثناء يدوي',
   noCache: 'زامن قائمة الأسر قبل العمل بدون شبكة.',
@@ -436,7 +452,7 @@ const ar: Record<keyof typeof en, string> = {
   tileAdmin: 'المستخدمون والأدوار ونقاط التوزيع',
   tileSop: 'خطوات الميدان للفريق',
   pinShared: 'رمز المشرف',
-  pointsSubtitle: 'أنشئ النقاط، وعدّل الأسماء والمديرية، فعّل أو أوقف، وعيّن الموظفين.',
+  pointsSubtitle: 'أنشئ النقاط، وعدّل الأسماء وسياج GPS، فعّل أو أوقف، وعيّن الموظفين.',
   createPoint: 'إضافة نقطة',
   editPoint: 'تعديل نقطة التوزيع',
   searchPoints: 'بحث بالرمز أو الاسم',
@@ -450,6 +466,22 @@ const ar: Record<keyof typeof en, string> = {
   householdsShort: 'الأسر',
   staffShort: 'الموظفون',
   noStaffAssigned: 'لا موظفون معيّنون بعد',
+  out_of_geofence: 'خارج نطاق GPS المسموح لهذه النقطة. اقترب أكثر أو اطلب من الإدارة توسيع النطاق.',
+  location_required: 'فحص GPS مفعّل لهذه النقطة، لكن الجهاز بلا موقع. فعّل خدمات الموقع وأعد المحاولة.',
+  other: 'مرفوض لسبب آخر.',
+  gpsSection: 'سياج GPS',
+  gpsCheckActive: 'تفعيل فحص GPS',
+  gpsCheckHint: 'عند التفعيل تُرفض المسحات خارج النطاق (أو بلا موقع). خط العرض والطول يُحفظان دائماً عند توفرهما.',
+  latitude: 'خط العرض',
+  longitude: 'خط الطول',
+  gpsRadiusM: 'النطاق المسموح (متر)',
+  gpsRadiusHint: 'من 10 إلى 5000 متر. الافتراضي 150.',
+  gpsUnset: 'لم يُحدد موقع GPS',
+  gpsOn: 'فحص GPS مفعّل',
+  gpsOff: 'فحص GPS متوقف',
+  invalid_gps_radius: 'يجب أن يكون النطاق بين 10 و 5000 متر.',
+  gps_point_required: 'فعّل فحص GPS فقط بعد إدخال خط العرض والطول لهذه النقطة.',
+  rejectDetail: 'سبب الرفض',
 }
 
 export type CopyKey = keyof typeof en
@@ -471,8 +503,16 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     document.documentElement.lang = locale
     document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr'
   }, [locale])
-  const value = useMemo(() => ({ locale, setLocale, t: (key: CopyKey) => (locale === 'ar' ? ar[key] : en[key]) }), [locale])
+  const value = useMemo(() => ({ locale, setLocale, t: (key: CopyKey) => (locale === 'ar' ? ar[key] ?? en[key] : en[key]) }), [locale])
   return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>
+}
+
+
+/** Human-readable reject/block reason; never returns a blank or raw missing key. */
+export function reasonLabel(t: (key: CopyKey) => string, key: string | null | undefined): string {
+  if (!key) return t('other')
+  if (Object.prototype.hasOwnProperty.call(en, key)) return t(key as CopyKey)
+  return `${t('other')} (${key})`
 }
 
 export function useI18n() {

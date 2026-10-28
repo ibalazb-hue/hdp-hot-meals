@@ -4,7 +4,7 @@ import { apiJson } from '../api'
 import { useAuth } from '../auth'
 import { db, type LocalScan } from '../db'
 import { corrections, pendingCount } from '../submit'
-import { useI18n, type CopyKey } from '../i18n'
+import { reasonLabel, useI18n } from '../i18n'
 import { Alert, EmptyState, PageHeader, Panel, ProgressBar, SelectInput, StatCard, TextInput } from '../components/ui'
 
 interface DashBody {
@@ -193,7 +193,7 @@ export function DashboardPage() {
           <ul className="mt-3 grid gap-2 sm:grid-cols-2">
             {Object.entries(reasons).map(([reason, count]) => (
               <li key={reason} className="flex items-center justify-between rounded-xl bg-mist px-3 py-2 text-sm">
-                <span>{t(reason as CopyKey)}</span>
+                <span>{reasonLabel(t, reason)}</span>
                 <span className="tabular font-bold">{count}</span>
               </li>
             ))}
@@ -208,7 +208,7 @@ export function DashboardPage() {
           <ul className="mt-3 space-y-1 font-mono text-sm" dir="ltr">
             {fixes.map((scan) => (
               <li key={scan.id} className="rounded-lg bg-mist px-3 py-2">
-                {scan.hhCode} · {scan.messageKey}
+                {scan.hhCode} · {reasonLabel(t, scan.messageKey ?? scan.blockReason)}
               </li>
             ))}
           </ul>

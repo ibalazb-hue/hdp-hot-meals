@@ -68,7 +68,7 @@ Open `http://localhost:8787`. Health: `GET /api/health`.
 - **Camera / QR:** Needs **HTTPS** (or localhost). Chrome on Android; grant camera permission. Manual card code entry works if the camera fails.
 - **Offline:** PWA + IndexedDB queue scans; first successful Served for household+Aden day wins on sync. Tablets must sync when network returns. First login and caseload sync need network.
 - **PWA install:** HTTPS + `manifest.webmanifest` + service worker (already in the Vite build).
-- **Geolocation:** Optional audit fields; a missing fix does **not** block the meal.
+- **Geolocation:** Every scan stores tablet lat/lng when available. Per-point GPS check (Admin → Points) can be on or off; when on, outside-radius or missing fix blocks the meal.
 - **Ephemeral disk:** Without `DATABASE_URL` and without a volume, PGlite data may reset on redeploy — use Postgres for live distribution.
 - **Training seed:** Never leave `SEED=true` or training passwords on a live kitchen server.
 

@@ -18,3 +18,4 @@ export {
 export { reconciliationVariance, type VarianceResult } from './reconcile'
 export { hashSecret, verifySecret } from './secret'
 export { TRAINING_PASSWORD, TRAINING_PIN } from './training'
+export { checkGeofence, distanceMeters, type GeofencePoint, type GeofenceVerdict } from './geo'

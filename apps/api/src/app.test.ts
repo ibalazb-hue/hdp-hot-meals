@@ -434,4 +434,95 @@ describe('admin distribution points', () => {
     ).find((row) => row.username === 'focal.mudhaffar')
     expect(focalAfter?.dpCodes.sort()).toEqual(['MDF01', 'MDF02', 'MDF06'])
   })
+
+  it('saves per-point GPS settings and blocks when the fence is enforced', async () => {
+    const admin = await login('admin.taiz')
+    const meal = await login('meal.taiz')
+    async function newCard() {
+      const created = await app.request('/api/households', {
+        method: 'POST',
+        headers: auth(meal.token),
+        body: JSON.stringify({ dpCode: 'MDF01', beneficiaryCount: 3, label: 'GPS test' }),
+      })
+      expect(created.status).toBe(201)
+      const hh = (await created.json()) as { cardCode: string }
+      return hh.cardCode
+    }
+    const farCard = await newCard()
+    const missingCard = await newCard()
+    const nearCard = await newCard()
+    const offCard = await newCard()
+
+    const patched = await app.request('/api/admin/dps/MDF01', {
+      method: 'PATCH',
+      headers: auth(admin.token),
+      body: JSON.stringify({
+        latitude: 13.58,
+        longitude: 44.02,
+        gpsRadiusM: 100,
+        gpsCheckActive: true,
+      }),
+    })
+    expect(patched.status).toBe(200)
+    const body = (await patched.json()) as {
+      latitude: number
+      longitude: number
+      gpsRadiusM: number
+      gpsCheckActive: boolean
+    }
+    expect(body.gpsCheckActive).toBe(true)
+    expect(body.gpsRadiusM).toBe(100)
+    expect(body.latitude).toBeCloseTo(13.58)
+
+    const focal = await login('focal.mudhaffar')
+    const far = await postScan(
+      focal.token,
+      scan(focal.user.id, {
+        cardCode: farCard,
+        latitude: 13.6,
+        longitude: 44.02,
+        locationAccuracyM: 12,
+      }),
+    )
+    expect(far.status).toBe(200)
+    expect(far.json.scan?.result).toBe('Blocked')
+    expect(far.json.scan?.blockReason).toBe('out_of_geofence')
+    expect(far.json.scan?.countsAsDistributed).toBe(false)
+    const farStored = far.json.scan as { latitude?: number; longitude?: number }
+    expect(farStored.latitude).toBeCloseTo(13.6)
+    expect(farStored.longitude).toBeCloseTo(44.02)
+
+    const missing = await postScan(focal.token, scan(focal.user.id, { cardCode: missingCard }))
+    expect(missing.json.scan?.blockReason).toBe('location_required')
+
+    const near = await postScan(
+      focal.token,
+      scan(focal.user.id, {
+        cardCode: nearCard,
+        latitude: 13.5801,
+        longitude: 44.02,
+        locationAccuracyM: 8,
+      }),
+    )
+    expect(near.json.scan?.result).toBe('Served')
+    expect(near.json.scan?.countsAsDistributed).toBe(true)
+
+    const off = await app.request('/api/admin/dps/MDF01', {
+      method: 'PATCH',
+      headers: auth(admin.token),
+      body: JSON.stringify({ gpsCheckActive: false }),
+    })
+    expect(off.status).toBe(200)
+    const stillFar = await postScan(
+      focal.token,
+      scan(focal.user.id, {
+        cardCode: offCard,
+        latitude: 13.6,
+        longitude: 44.02,
+      }),
+    )
+    expect(stillFar.json.scan?.result).toBe('Served')
+    const still = stillFar.json.scan as { latitude?: number }
+    expect(still.latitude).toBeCloseTo(13.6)
+  })
 })

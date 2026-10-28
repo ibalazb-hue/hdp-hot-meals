@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useAuth } from '../auth'
 import { db, type LocalScan } from '../db'
-import { useI18n, type CopyKey } from '../i18n'
+import { reasonLabel, useI18n } from '../i18n'
 import { readCard, submitScan } from '../submit'
 import { SupervisorNames } from '../components/SupervisorNames'
 import { Button, Field, PageHeader, Panel, SelectInput, TextInput } from '../components/ui'
@@ -104,7 +104,7 @@ export function ScanPage() {
   }
 
   const counting = result?.countsAsDistributed
-  const messageKey = (result?.messageKey ?? 'unknown') as CopyKey
+  const rejectText = reasonLabel(t, result?.messageKey ?? result?.blockReason ?? 'unknown')
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col gap-3 overflow-hidden pb-2">
@@ -117,9 +117,14 @@ export function ScanPage() {
           className={`flex min-h-full flex-col rounded-2xl p-5 text-white shadow-lg ${counting ? 'bg-served' : 'bg-blocked'}`}
         >
           <p className="text-sm">{counting ? t('serveOne') : t('doNotServe')}</p>
-          <h2 data-testid="result-title" className="text-4xl font-bold">
-            {t(messageKey)}
+          <h2 data-testid="result-title" className="text-3xl font-bold leading-snug sm:text-4xl">
+            {rejectText}
           </h2>
+          {!counting && result?.blockReason ? (
+            <p className="mt-1 text-sm text-white/85" data-testid="reject-detail">
+              {t('rejectDetail')}: {reasonLabel(t, result.blockReason)}
+            </p>
+          ) : null}
           <p className="mt-2 text-end font-mono text-2xl" dir="ltr">
             {result.hhCode ?? result.cardCode}
           </p>

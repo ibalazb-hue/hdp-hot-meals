@@ -203,6 +203,10 @@ export function createApp(db: Database, options?: { distDir?: string }) {
         nameAr: z.string().trim().min(2).max(80),
         district: z.enum(['Al-Mudhaffar', 'Al-Qahira']),
         active: z.boolean().optional(),
+        latitude: z.number().gte(-90).lte(90).nullish(),
+        longitude: z.number().gte(-180).lte(180).nullish(),
+        gpsRadiusM: z.number().gte(10).lte(5000).nullish(),
+        gpsCheckActive: z.boolean().optional(),
       }),
       await c.req.json(),
     )
@@ -217,6 +221,10 @@ export function createApp(db: Database, options?: { distDir?: string }) {
         nameAr: z.string().trim().min(2).max(80).optional(),
         district: z.enum(['Al-Mudhaffar', 'Al-Qahira']).optional(),
         userIds: z.array(z.string().min(1).max(64)).max(200).optional(),
+        latitude: z.number().gte(-90).lte(90).nullish(),
+        longitude: z.number().gte(-180).lte(180).nullish(),
+        gpsRadiusM: z.number().gte(10).lte(5000).nullish(),
+        gpsCheckActive: z.boolean().optional(),
       }),
       await c.req.json(),
     )

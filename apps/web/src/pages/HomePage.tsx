@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { adenDate, type Role } from '@hdp/rules'
 import { useAuth } from '../auth'
 import { db } from '../db'
-import { bundleAge } from '../submit'
+import { bundleAge, pendingCount } from '../submit'
 import { useI18n, type CopyKey } from '../i18n'
 import { Icon, RoleBadge, type IconName } from '../components/ui'
 
@@ -47,16 +47,41 @@ const DESC: Partial<Record<CopyKey, CopyKey>> = {
 
 export function HomePage() {
   const { session } = useAuth()
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const [served, setServed] = useState(0)
+  const [pending, setPending] = useState(0)
   const [updated, setUpdated] = useState<string | null>(null)
   const role = session?.user.role ?? 'dp_focal'
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     const date = adenDate()
-    void db.scans.where('scanDate').equals(date).and((scan) => scan.countsAsDistributed).count().then(setServed)
+    void db.scans
+      .where('scanDate')
+      .equals(date)
+      .and((scan) => scan.countsAsDistributed)
+      .count()
+      .then(setServed)
+    void pendingCount().then(setPending)
     void bundleAge().then(setUpdated)
   }, [])
+
+  useEffect(() => {
+    refresh()
+    const onSync = () => refresh()
+    const onVis = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    window.addEventListener('hdp-sync', onSync)
+    window.addEventListener('online', onSync)
+    document.addEventListener('visibilitychange', onVis)
+    const timer = window.setInterval(refresh, 5000)
+    return () => {
+      window.removeEventListener('hdp-sync', onSync)
+      window.removeEventListener('online', onSync)
+      document.removeEventListener('visibilitychange', onVis)
+      window.clearInterval(timer)
+    }
+  }, [refresh])
 
   const icons: Partial<Record<CopyKey, IconName>> = {
     scan: 'scan',
@@ -69,6 +94,10 @@ export function HomePage() {
     admin: 'admin',
     sop: 'sop',
   }
+
+  const syncLabel = updated
+    ? new Date(updated).toLocaleString(locale === 'ar' ? 'ar' : 'en', { timeZone: 'Asia/Aden' })
+    : t('neverSynced')
 
   return (
     <div className="grid gap-4">
@@ -84,16 +113,22 @@ export function HomePage() {
           )}
           <p className="mt-1 text-sm text-white/75">{t('oneMeal')}</p>
         </div>
-        <div className="grid grid-cols-2 border-t border-white/15 bg-black/10">
+        <div className="grid grid-cols-2 border-t border-white/15 bg-black/10 sm:grid-cols-3">
           <div className="px-5 py-4">
             <p className="tabular text-4xl font-bold" data-testid="home-served">
               {served}
             </p>
             <p className="text-sm text-white/75">{t('servedToday')}</p>
           </div>
-          <div className="border-s border-white/15 px-5 py-4 text-sm text-white/80">
+          <div className="border-s border-white/15 px-5 py-4" data-testid="home-pending">
+            <p className="tabular text-4xl font-bold">{pending}</p>
+            <p className="text-sm text-white/75">{t('pending')}</p>
+          </div>
+          <div className="col-span-2 border-t border-white/15 px-5 py-4 text-sm text-white/80 sm:col-span-1 sm:border-s sm:border-t-0">
             <p className="font-semibold text-white/90">{t('lastSync')}</p>
-            <p className="mt-1 leading-snug">{updated ? new Date(updated).toLocaleString() : t('neverSynced')}</p>
+            <p className="mt-1 leading-snug" data-testid="home-last-sync" dir="ltr">
+              {syncLabel}
+            </p>
           </div>
         </div>
       </section>

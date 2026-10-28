@@ -1,5 +1,6 @@
 import {
   adenDate,
+  checkGeofence,
   decideScan,
   parseCardPayload,
   resolveArrival,
@@ -186,7 +187,7 @@ export async function submitScan(input: ScanRequest): Promise<LocalScan> {
   if ((input.mode === 'manual' || input.overrideReason) && !authorized && !navigator.onLine) {
     throw new ApiError(400, 'bad_pin')
   }
-  const { decision, cardCode, scanDate } = await localDecision(input, id, scannedAt, authorized)
+  let { decision, cardCode, scanDate } = await localDecision(input, id, scannedAt, authorized)
   let clientResult = decision.result
   if (input.mode === 'manual' && decision.blockReason !== 'voided' && decision.blockReason !== 'unknown' && decision.blockReason !== 'inactive' && decision.blockReason !== 'already_served') {
     clientResult = authorized || navigator.onLine ? 'ManualException' : decision.result
@@ -203,6 +204,37 @@ export async function submitScan(input: ScanRequest): Promise<LocalScan> {
     latitude: location?.latitude ?? null,
     longitude: location?.longitude ?? null,
     locationAccuracyM: location?.accuracy ?? null,
+  }
+  const dpMeta = await db.dps.get(input.dpCode)
+  if (dpMeta?.gpsCheckActive && (clientResult === 'Served' || clientResult === 'Override' || clientResult === 'ManualException' || decision.countsAsDistributed)) {
+    const fix =
+      locationFields.latitude != null && locationFields.longitude != null
+        ? { latitude: locationFields.latitude, longitude: locationFields.longitude }
+        : null
+    const verdict = checkGeofence(
+      {
+        latitude: dpMeta.latitude ?? null,
+        longitude: dpMeta.longitude ?? null,
+        gpsRadiusM: dpMeta.gpsRadiusM ?? 150,
+        gpsCheckActive: true,
+      },
+      fix,
+    )
+    if (!verdict.ok) {
+      decision = {
+        result: 'Blocked',
+        blockReason: verdict.reason,
+        countsAsDistributed: false,
+        hhCode: decision.hhCode,
+        messageKey: verdict.reason,
+        demoteExistingId: null,
+        conflictNote:
+          verdict.distanceM != null
+            ? `Distance ${Math.round(verdict.distanceM)} m exceeds ${dpMeta.gpsRadiusM ?? 150} m`
+            : null,
+      }
+      clientResult = 'Blocked'
+    }
   }
   const payload = {
     id,
@@ -240,7 +272,7 @@ export async function submitScan(input: ScanRequest): Promise<LocalScan> {
         })
         await forgetServed(body.demotedScanId)
       }
-      return saveLocal(
+      const saved = await saveLocal(
         toLocal(
           session,
           input,
@@ -260,6 +292,8 @@ export async function submitScan(input: ScanRequest): Promise<LocalScan> {
           },
         ),
       )
+      notify()
+      return saved
     } catch (error) {
       const offline = error instanceof DOMException || (error instanceof ApiError && error.code === 'offline')
       if (!offline) throw error
@@ -352,7 +386,9 @@ export async function flushQueue(): Promise<number> {
         await forgetServed(result.demotedScanId)
       }
     }
-    return body.results.filter((result) => result.ok).length
+    const accepted = body.results.filter((result) => result.ok).length
+    if (accepted > 0) notify()
+    return accepted
   } catch {
     return 0
   }
@@ -364,7 +400,16 @@ export async function pullBundle(): Promise<void> {
   const bundle = (await response.json()) as {
     generatedAt: string
     scanDate: string
-    dps: Array<{ code: string; nameEn: string; nameAr: string; district: string }>
+    dps: Array<{
+      code: string
+      nameEn: string
+      nameAr: string
+      district: string
+      latitude?: number | null
+      longitude?: number | null
+      gpsRadiusM?: number
+      gpsCheckActive?: boolean
+    }>
     households: BundleHousehold[]
     voidedCards: Array<{ cardCode: string; hhCode: string }>
     servedToday: Array<{ clientScanId: string; hhCode: string; result: string; scannedAt: string; dpCode: string }>
@@ -377,7 +422,18 @@ export async function pullBundle(): Promise<void> {
     await db.households.bulkPut(bundle.households)
     await db.voidedCards.clear()
     await db.voidedCards.bulkPut(bundle.voidedCards)
-    await db.dps.bulkPut(bundle.dps)
+    await db.dps.bulkPut(
+      bundle.dps.map((dp) => ({
+        code: dp.code,
+        nameEn: dp.nameEn,
+        nameAr: dp.nameAr,
+        district: dp.district,
+        latitude: dp.latitude ?? null,
+        longitude: dp.longitude ?? null,
+        gpsRadiusM: dp.gpsRadiusM ?? 150,
+        gpsCheckActive: Boolean(dp.gpsCheckActive),
+      })),
+    )
     await db.pins.clear()
     await db.pins.bulkPut(bundle.supervisorPins)
     await db.served.clear()
@@ -416,6 +472,7 @@ export async function syncAll(): Promise<void> {
   if (typeof navigator === 'undefined' || navigator.onLine) {
     try {
       await pullBundle()
+      await db.meta.put({ key: 'lastSyncAt', value: new Date().toISOString() })
     } catch {
       /* keep the last validated list */
     }
@@ -435,6 +492,8 @@ export async function registerScanSync(): Promise<void> {
 }
 
 export async function bundleAge(): Promise<string | null> {
+  const sync = await db.meta.get('lastSyncAt')
+  if (sync?.value) return sync.value
   const row = await db.meta.get('bundleAt')
   return row?.value ?? null
 }

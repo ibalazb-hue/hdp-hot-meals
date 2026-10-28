@@ -1,6 +1,7 @@
 import {
   adenDate,
   cardPayload,
+  checkGeofence,
   countsAsDistributed,
   decideScan,
   formatHhCode,
@@ -88,6 +89,8 @@ const BLOCKS = new Set<BlockReason>([
   'inactive',
   'no_card',
   'duplicate_conflict',
+  'out_of_geofence',
+  'location_required',
 ])
 
 function inClause(values: string[], start: number): { sql: string; next: number } {
@@ -183,6 +186,47 @@ export async function login(db: Database, username: string, password: string): P
   const actor = await loadActor(db, String(row.id))
   if (!actor) throw new HttpError(401, 'invalid_login')
   return actor
+}
+
+
+async function loadDpGeofence(tx: Queryable, dpCode: string) {
+  const rows = await tx.query(
+    `SELECT latitude, longitude, gps_radius_m, gps_check_active FROM distribution_points WHERE code = $1`,
+    [dpCode],
+  )
+  if (!rows[0]) throw new HttpError(400, 'unknown_dp')
+  return {
+    latitude: rows[0].latitude == null ? null : Number(rows[0].latitude),
+    longitude: rows[0].longitude == null ? null : Number(rows[0].longitude),
+    gpsRadiusM: Number(rows[0].gps_radius_m) || 150,
+    gpsCheckActive: asBool(rows[0].gps_check_active),
+  }
+}
+
+function applyGeofence(
+  decision: ScanDecision,
+  point: { latitude: number | null; longitude: number | null; gpsRadiusM: number; gpsCheckActive: boolean },
+  scan: IncomingScan,
+): ScanDecision {
+  if (!decision.countsAsDistributed) return decision
+  const fix =
+    scan.latitude != null && scan.longitude != null
+      ? { latitude: scan.latitude, longitude: scan.longitude }
+      : null
+  const verdict = checkGeofence(point, fix)
+  if (verdict.ok) return decision
+  return {
+    result: 'Blocked',
+    blockReason: verdict.reason,
+    countsAsDistributed: false,
+    hhCode: decision.hhCode,
+    messageKey: verdict.reason,
+    demoteExistingId: null,
+    conflictNote:
+      verdict.distanceM != null
+        ? `Distance ${Math.round(verdict.distanceM)} m exceeds ${point.gpsRadiusM} m`
+        : null,
+  }
 }
 
 async function assertActiveDp(tx: Queryable, dpCode: string): Promise<void> {
@@ -375,6 +419,8 @@ export async function applyOne(
     if (decision.countsAsDistributed) {
       decision = resolveArrival(decision, existingSuccess, { clientScanId: scan.id, scannedAt: scan.scannedAt })
     }
+    const fence = await loadDpGeofence(tx, scan.dpCode)
+    decision = applyGeofence(decision, fence, scan)
     if (!countsAsDistributed(scan.clientResult)) {
       decision = forceClientBlock(decision, scan.clientBlockReason)
     }
@@ -438,7 +484,8 @@ export async function syncBundle(db: Database, actor: Actor) {
   }
   const dpsIn = inClause(actor.dpCodes, 1)
   const dps = await db.query(
-    `SELECT code, name_en, name_ar, district FROM distribution_points WHERE active = TRUE AND code IN (${dpsIn.sql}) ORDER BY code`,
+    `SELECT code, name_en, name_ar, district, latitude, longitude, gps_radius_m, gps_check_active
+     FROM distribution_points WHERE active = TRUE AND code IN (${dpsIn.sql}) ORDER BY code`,
     actor.dpCodes,
   )
   const households = await db.query(
@@ -484,6 +531,10 @@ export async function syncBundle(db: Database, actor: Actor) {
       nameEn: String(row.name_en),
       nameAr: String(row.name_ar),
       district: String(row.district),
+      latitude: row.latitude == null ? null : Number(row.latitude),
+      longitude: row.longitude == null ? null : Number(row.longitude),
+      gpsRadiusM: Number(row.gps_radius_m) || 150,
+      gpsCheckActive: asBool(row.gps_check_active),
     })),
     households: households.map((row) => mapHousehold(row)),
     voidedCards: voidedCards.map((row) => ({ cardCode: String(row.card_code), hhCode: String(row.hh_code) })),
@@ -837,6 +888,7 @@ export async function exportRegister(db: Database, actor: Actor, scanDate: strin
 export async function listDps(db: Database) {
   const rows = await db.query(
     `SELECT d.code, d.name_en, d.name_ar, d.district, d.active,
+            d.latitude, d.longitude, d.gps_radius_m, d.gps_check_active,
             COALESCE((SELECT COUNT(*)::int FROM households h WHERE h.dp_code = d.code AND h.status = 'active'), 0) AS household_count
      FROM distribution_points d
      ORDER BY d.code`,
@@ -855,6 +907,10 @@ export async function listDps(db: Database) {
       nameAr: String(row.name_ar),
       district: String(row.district),
       active: asBool(row.active),
+      latitude: row.latitude == null ? null : Number(row.latitude),
+      longitude: row.longitude == null ? null : Number(row.longitude),
+      gpsRadiusM: Number(row.gps_radius_m) || 150,
+      gpsCheckActive: asBool(row.gps_check_active),
       householdCount: Number(row.household_count) || 0,
       assignedUsers: links
         .filter((link) => String(link.dp_code) === code)
@@ -878,19 +934,50 @@ function normalizeDpCode(code: string): string {
   return normalized
 }
 
+function normalizeGpsFields(input: {
+  latitude?: number | null
+  longitude?: number | null
+  gpsRadiusM?: number | null
+  gpsCheckActive?: boolean | null
+}) {
+  const latitude = input.latitude == null ? null : Number(input.latitude)
+  const longitude = input.longitude == null ? null : Number(input.longitude)
+  if ((latitude == null) !== (longitude == null)) throw new HttpError(400, 'invalid_location')
+  if (latitude != null && (latitude < -90 || latitude > 90)) throw new HttpError(400, 'invalid_location')
+  if (longitude != null && (longitude < -180 || longitude > 180)) throw new HttpError(400, 'invalid_location')
+  const gpsRadiusM = input.gpsRadiusM == null ? 150 : Number(input.gpsRadiusM)
+  if (!Number.isFinite(gpsRadiusM) || gpsRadiusM < 10 || gpsRadiusM > 5000) throw new HttpError(400, 'invalid_gps_radius')
+  const gpsCheckActive = Boolean(input.gpsCheckActive)
+  if (gpsCheckActive && (latitude == null || longitude == null)) throw new HttpError(400, 'gps_point_required')
+  return { latitude, longitude, gpsRadiusM, gpsCheckActive }
+}
+
 export async function createDp(
   db: Database,
-  input: { code: string; nameEn: string; nameAr: string; district: District; active?: boolean },
+  input: {
+    code: string
+    nameEn: string
+    nameAr: string
+    district: District
+    active?: boolean
+    latitude?: number | null
+    longitude?: number | null
+    gpsRadiusM?: number | null
+    gpsCheckActive?: boolean | null
+  },
 ) {
   const code = normalizeDpCode(input.code)
   const nameEn = input.nameEn.trim()
   const nameAr = input.nameAr.trim()
   const active = input.active !== false
+  const gps = normalizeGpsFields(input)
   try {
     await db.transaction(async (tx) => {
       await tx.query(
-        `INSERT INTO distribution_points (code, name_en, name_ar, district, active) VALUES ($1, $2, $3, $4, $5)`,
-        [code, nameEn, nameAr, input.district, active],
+        `INSERT INTO distribution_points
+           (code, name_en, name_ar, district, active, latitude, longitude, gps_radius_m, gps_check_active)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [code, nameEn, nameAr, input.district, active, gps.latitude, gps.longitude, gps.gpsRadiusM, gps.gpsCheckActive],
       )
       await tx.query(`INSERT INTO hh_counters (dp_code, last_number) VALUES ($1, 0)`, [code])
     })
@@ -904,6 +991,10 @@ export async function createDp(
     nameAr,
     district: input.district,
     active,
+    latitude: gps.latitude,
+    longitude: gps.longitude,
+    gpsRadiusM: gps.gpsRadiusM,
+    gpsCheckActive: gps.gpsCheckActive,
     householdCount: 0,
     assignedUsers: [] as Array<{ id: string; username: string; displayName: string; role: string; active: boolean }>,
   }
@@ -933,11 +1024,16 @@ export async function patchDp(
     nameAr?: string
     district?: District
     userIds?: string[]
+    latitude?: number | null
+    longitude?: number | null
+    gpsRadiusM?: number | null
+    gpsCheckActive?: boolean | null
   },
 ) {
   const currentCode = code.trim().toUpperCase()
   const current = await db.query(
-    `SELECT code, name_en, name_ar, district, active FROM distribution_points WHERE code = $1`,
+    `SELECT code, name_en, name_ar, district, active, latitude, longitude, gps_radius_m, gps_check_active
+     FROM distribution_points WHERE code = $1`,
     [currentCode],
   )
   if (!current[0]) throw new HttpError(404, 'unknown_dp')
@@ -948,14 +1044,37 @@ export async function patchDp(
   const nameAr = input.nameAr !== undefined ? input.nameAr.trim() : String(current[0].name_ar)
   const district = input.district ?? (String(current[0].district) as District)
   const active = typeof input.active === 'boolean' ? input.active : asBool(current[0].active)
+  const gps = normalizeGpsFields({
+    latitude: input.latitude !== undefined ? input.latitude : (current[0].latitude == null ? null : Number(current[0].latitude)),
+    longitude: input.longitude !== undefined ? input.longitude : (current[0].longitude == null ? null : Number(current[0].longitude)),
+    gpsRadiusM: input.gpsRadiusM !== undefined ? input.gpsRadiusM : Number(current[0].gps_radius_m) || 150,
+    gpsCheckActive: input.gpsCheckActive !== undefined ? input.gpsCheckActive : asBool(current[0].gps_check_active),
+  })
   await db.query(
-    `UPDATE distribution_points SET name_en = $2, name_ar = $3, district = $4, active = $5 WHERE code = $1`,
-    [currentCode, nameEn, nameAr, district, active],
+    `UPDATE distribution_points
+     SET name_en = $2, name_ar = $3, district = $4, active = $5,
+         latitude = $6, longitude = $7, gps_radius_m = $8, gps_check_active = $9
+     WHERE code = $1`,
+    [currentCode, nameEn, nameAr, district, active, gps.latitude, gps.longitude, gps.gpsRadiusM, gps.gpsCheckActive],
   )
   if (input.userIds) await replaceDpAssignments(db, currentCode, input.userIds)
   const listed = await listDps(db)
   const row = listed.find((item) => item.code === currentCode)
-  return row ?? { code: currentCode, nameEn, nameAr, district, active, householdCount: 0, assignedUsers: [] }
+  return (
+    row ?? {
+      code: currentCode,
+      nameEn,
+      nameAr,
+      district,
+      active,
+      latitude: gps.latitude,
+      longitude: gps.longitude,
+      gpsRadiusM: gps.gpsRadiusM,
+      gpsCheckActive: gps.gpsCheckActive,
+      householdCount: 0,
+      assignedUsers: [],
+    }
+  )
 }
 
 export async function listUsers(db: Database) {

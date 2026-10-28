@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { isHhCode, normalizeHhCode } from '@hdp/rules'
 import { useAuth } from '../auth'
 import { explainError } from '../errors'
-import { useI18n, type CopyKey } from '../i18n'
+import { reasonLabel, useI18n } from '../i18n'
 import { submitScan } from '../submit'
 import { SupervisorNames } from '../components/SupervisorNames'
 import { Alert, Button, Field, PageHeader, Panel, SelectInput, TextInput } from '../components/ui'
@@ -30,7 +30,7 @@ export function ManualPage() {
         supervisorPin: pin,
       })
       setOk(scan.countsAsDistributed)
-      setMessage(t((scan.messageKey as CopyKey) ?? 'unknown'))
+      setMessage(reasonLabel(t, scan.messageKey ?? scan.blockReason ?? 'unknown'))
     } catch (err) {
       setOk(false)
       setMessage(explainError(t, err))

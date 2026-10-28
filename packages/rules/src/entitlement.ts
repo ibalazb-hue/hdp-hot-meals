@@ -12,6 +12,8 @@ export const BLOCK_REASONS = [
   'inactive',
   'no_card',
   'duplicate_conflict',
+  'out_of_geofence',
+  'location_required',
 ] as const
 export type BlockReason = (typeof BLOCK_REASONS)[number]
 

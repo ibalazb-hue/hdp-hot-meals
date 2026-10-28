@@ -65,7 +65,7 @@ class HdpDB extends Dexie {
   voidedCards!: Table<{ cardCode: string; hhCode: string }, string>
   served!: Table<ServedRow, string>
   scans!: Table<LocalScan, string>
-  dps!: Table<{ code: string; nameEn: string; nameAr: string; district: string }, string>
+  dps!: Table<{ code: string; nameEn: string; nameAr: string; district: string; latitude: number | null; longitude: number | null; gpsRadiusM: number; gpsCheckActive: boolean }, string>
   pins!: Table<{ userId: string; username: string; displayName: string; pinHash: string }, string>
   meta!: Table<{ key: string; value: string }, string>
 
