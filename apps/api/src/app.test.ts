@@ -738,3 +738,41 @@ describe('card template', () => {
     expect(hh.showHdpLogo).toBe(false)
   })
 })
+
+describe('admin audit log', () => {
+  it('returns a feed after admin mutations and includes legacy production history', async () => {
+    const admin = await login('admin.taiz')
+    const meal = await login('meal.taiz')
+
+    const template = await app.request('/api/admin/card-template', {
+      method: 'PUT',
+      headers: auth(admin.token),
+      body: JSON.stringify({ primaryColor: '#0B5C6B', titleAr: 'بطاقة أسرة مستفيدة' }),
+    })
+    expect(template.status).toBe(200)
+
+    const prod = await app.request('/api/production', {
+      method: 'POST',
+      headers: auth(meal.token),
+      body: JSON.stringify({ dpCode: 'MDF01', productionDate: '2026-10-28', mealsPrepared: 42 }),
+    })
+    expect(prod.status).toBe(200)
+
+    const forbidden = await app.request('/api/admin/audit-log', { headers: auth(meal.token) })
+    expect(forbidden.status).toBe(403)
+
+    const feed = await app.request('/api/admin/audit-log?limit=100', { headers: auth(admin.token) })
+    expect(feed.status).toBe(200)
+    const rows = (await feed.json()) as Array<{ action: string; entityType: string; summary: string }>
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows.some((r) => r.entityType === 'card_template' || r.action.includes('template'))).toBe(true)
+    expect(rows.some((r) => r.entityType === 'production')).toBe(true)
+
+    const filtered = await app.request('/api/admin/audit-log?entityType=production', {
+      headers: auth(admin.token),
+    })
+    expect(filtered.status).toBe(200)
+    const prodOnly = (await filtered.json()) as Array<{ entityType: string }>
+    expect(prodOnly.every((r) => r.entityType === 'production')).toBe(true)
+  })
+})

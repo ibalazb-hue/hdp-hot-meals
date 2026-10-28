@@ -22,6 +22,8 @@ import {
   listDevices,
   listDps,
   listHouseholds,
+  listPrintableHouseholds,
+  listAdminActivity,
   listUsers,
   loadActor,
   login,
@@ -131,6 +133,15 @@ export function createApp(db: Database, options?: { distDir?: string }) {
   app.get('/api/households', async (c) =>
     c.json(await listHouseholds(db, c.get('actor'), { q: c.req.query('q'), dp: c.req.query('dp') })),
   )
+  app.get('/api/households/print-pack', async (c) =>
+    c.json(
+      await listPrintableHouseholds(db, c.get('actor'), {
+        q: c.req.query('q'),
+        dp: c.req.query('dp'),
+        limit: c.req.query('limit') ? Number(c.req.query('limit')) : undefined,
+      }),
+    ),
+  )
   app.post('/api/households', async (c) => {
     const body = parse(
       z.object({
@@ -231,7 +242,7 @@ export function createApp(db: Database, options?: { distDir?: string }) {
       }),
       await c.req.json(),
     )
-    return c.json(await createDp(db, body), 201)
+    return c.json(await createDp(db, body, c.get('actor')), 201)
   })
   app.patch('/api/admin/dps/:code', async (c) => {
     const body = parse(
@@ -249,7 +260,7 @@ export function createApp(db: Database, options?: { distDir?: string }) {
       }),
       await c.req.json(),
     )
-    return c.json(await patchDp(db, c.req.param('code'), body))
+    return c.json(await patchDp(db, c.req.param('code'), body, c.get('actor')))
   })
   app.get('/api/admin/users', async (c) => c.json(await listUsers(db)))
   app.post('/api/admin/users', async (c) => {
@@ -264,7 +275,7 @@ export function createApp(db: Database, options?: { distDir?: string }) {
       }),
       await c.req.json(),
     )
-    return c.json(await createUser(db, body), 201)
+    return c.json(await createUser(db, body, c.get('actor')), 201)
   })
   app.patch('/api/admin/users/:id', async (c) => {
     const body = parse(
@@ -279,18 +290,29 @@ export function createApp(db: Database, options?: { distDir?: string }) {
       }),
       await c.req.json(),
     )
-    return c.json(await updateUser(db, c.req.param('id'), body))
+    return c.json(await updateUser(db, c.req.param('id'), body, c.get('actor')))
   })
   app.delete('/api/admin/users/:id', async (c) => {
     return c.json(await deleteUser(db, c.get('actor').id, c.req.param('id')))
   })
   app.get('/api/admin/devices', async (c) => c.json(await listDevices(db)))
+  app.get('/api/admin/audit-log', async (c) =>
+    c.json(
+      await listAdminActivity(db, {
+        q: c.req.query('q'),
+        entityType: c.req.query('entityType'),
+        limit: c.req.query('limit') ? Number(c.req.query('limit')) : undefined,
+      }),
+    ),
+  )
   app.get('/api/admin/card-template', async (c) => c.json(await getCardTemplate(db)))
   app.put('/api/admin/card-template', async (c) => {
     const body = parse(
       z.object({
         titleEn: z.string().max(120).optional(),
         titleAr: z.string().max(120).optional(),
+        projectTitleAr: z.string().max(120).optional(),
+        primaryColor: z.string().max(20).optional(),
         showWfpLogo: z.boolean().optional(),
         showHdpLogo: z.boolean().optional(),
         wfpLogoDataUrl: z.string().max(400_000).nullish(),
@@ -300,6 +322,14 @@ export function createApp(db: Database, options?: { distDir?: string }) {
         freeLineAr: z.string().max(200).optional(),
         complaintsHeadingAr: z.string().max(120).optional(),
         hotlineHeadingAr: z.string().max(80).optional(),
+        hdpPanelTitleAr: z.string().max(120).optional(),
+        hdpPhone: z.string().max(80).optional(),
+        hdpWhatsapp: z.string().max(80).optional(),
+        partnerPanelTitleAr: z.string().max(120).optional(),
+        partnerPhone: z.string().max(80).optional(),
+        partnerWhatsapp: z.string().max(80).optional(),
+        reassuranceTextAr: z.string().max(400).optional(),
+        personalNoticeAr: z.string().max(300).optional(),
         wfpHotline: z.string().max(80).optional(),
         hdpHotline: z.string().max(80).optional(),
         validFrom: z.string().max(40).optional(),

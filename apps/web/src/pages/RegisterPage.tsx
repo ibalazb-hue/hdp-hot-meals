@@ -22,17 +22,23 @@ interface Issued {
   validTo?: string | null
   wfpHotline?: string | null
   hdpHotline?: string | null
-  titleEn?: string | null
   titleAr?: string | null
+  projectTitleAr?: string | null
+  primaryColor?: string | null
   showWfpLogo?: boolean
   showHdpLogo?: boolean
   wfpLogoDataUrl?: string | null
   hdpLogoDataUrl?: string | null
-  rulesText?: string | null
-  freeLineEn?: string | null
-  freeLineAr?: string | null
   complaintsHeadingAr?: string | null
   hotlineHeadingAr?: string | null
+  hdpPanelTitleAr?: string | null
+  hdpPhone?: string | null
+  hdpWhatsapp?: string | null
+  partnerPanelTitleAr?: string | null
+  partnerPhone?: string | null
+  partnerWhatsapp?: string | null
+  reassuranceTextAr?: string | null
+  personalNoticeAr?: string | null
   showSerial?: boolean
   showBatch?: boolean
 }
@@ -112,20 +118,24 @@ export function RegisterPage() {
               validTo={issued.validTo}
               cardSerial={issued.cardSerial ?? issued.cardCode}
               printBatch={issued.printBatch}
-              wfpHotline={issued.wfpHotline}
-              hdpHotline={issued.hdpHotline}
               beneficiaryCount={issued.beneficiaryCount}
-              titleEn={issued.titleEn}
               titleAr={issued.titleAr}
+              projectTitleAr={issued.projectTitleAr}
+              primaryColor={issued.primaryColor}
               showWfpLogo={issued.showWfpLogo}
               showHdpLogo={issued.showHdpLogo}
               wfpLogoDataUrl={issued.wfpLogoDataUrl}
               hdpLogoDataUrl={issued.hdpLogoDataUrl}
-              rulesText={issued.rulesText}
-              freeLineEn={issued.freeLineEn}
-              freeLineAr={issued.freeLineAr}
               complaintsHeadingAr={issued.complaintsHeadingAr}
               hotlineHeadingAr={issued.hotlineHeadingAr}
+              hdpPanelTitleAr={issued.hdpPanelTitleAr}
+              hdpPhone={issued.hdpPhone ?? issued.hdpHotline}
+              hdpWhatsapp={issued.hdpWhatsapp}
+              partnerPanelTitleAr={issued.partnerPanelTitleAr}
+              partnerPhone={issued.partnerPhone}
+              partnerWhatsapp={issued.partnerWhatsapp}
+              reassuranceTextAr={issued.reassuranceTextAr}
+              personalNoticeAr={issued.personalNoticeAr}
               showSerial={issued.showSerial}
               showBatch={issued.showBatch}
             />

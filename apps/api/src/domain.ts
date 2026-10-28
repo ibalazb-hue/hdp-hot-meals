@@ -604,6 +604,8 @@ function requireWriter(actor: Actor): void {
 export interface CardTemplate {
   titleEn: string
   titleAr: string
+  projectTitleAr: string
+  primaryColor: string
   showWfpLogo: boolean
   showHdpLogo: boolean
   wfpLogoDataUrl: string | null
@@ -613,6 +615,15 @@ export interface CardTemplate {
   freeLineAr: string
   complaintsHeadingAr: string
   hotlineHeadingAr: string
+  hdpPanelTitleAr: string
+  hdpPhone: string
+  hdpWhatsapp: string
+  partnerPanelTitleAr: string
+  partnerPhone: string
+  partnerWhatsapp: string
+  reassuranceTextAr: string
+  personalNoticeAr: string
+  /** @deprecated kept for older clients; mirrored into hdpPhone when empty */
   wfpHotline: string
   hdpHotline: string
   validFrom: string
@@ -627,28 +638,46 @@ const CARD_TEMPLATE_KEY = 'card_template'
 const MAX_LOGO_CHARS = 350_000
 
 export function defaultCardTemplate(): CardTemplate {
+  const hdpHotline = process.env.HDP_HOTLINE?.trim() || ''
   return {
-    titleEn: 'Hot Meal Entitlement Card – Free of Charge',
-    titleAr: 'بطاقة استحقاق وجبة ساخنة – مجاناً',
+    titleEn: 'Beneficiary household card',
+    titleAr: 'بطاقة أسرة مستفيدة',
+    projectTitleAr: 'المطبخ المجتمعي',
+    primaryColor: '#0B5C6B',
     showWfpLogo: true,
     showHdpLogo: true,
     wfpLogoDataUrl: null,
     hdpLogoDataUrl: null,
-    rulesText:
-      'One meal per household per day.\nThis card is personal and not for sale.\nReport loss at the help desk.',
+    rulesText: 'وجبة واحدة لكل أسرة في اليوم.\nالبطاقة شخصية وغير قابلة للبيع.\nبلّغ عن الفقدان في مكتب المساعدة.',
     freeLineEn: 'Assistance is FREE – do not pay anyone.',
     freeLineAr: 'المساعدة مجانية — لا تدفع لأي شخص',
-    complaintsHeadingAr: 'المقترحات والشكاوى',
+    complaintsHeadingAr: 'الشكاوى والمقترحات',
     hotlineHeadingAr: 'الخط الساخن',
+    hdpPanelTitleAr: 'برنامج التنمية الإنسانية',
+    hdpPhone: hdpHotline,
+    hdpWhatsapp: '',
+    partnerPanelTitleAr: '',
+    partnerPhone: '',
+    partnerWhatsapp: '',
+    reassuranceTextAr: 'المساعدة مجانية بالكامل — لا تدفع لأي شخص. وجبة واحدة لكل أسرة في اليوم.',
+    personalNoticeAr: 'هذه البطاقة شخصية وغير قابلة للبيع. بلّغ عن الفقدان في مكتب المساعدة.',
     wfpHotline: process.env.WFP_HOTLINE?.trim() || '',
-    hdpHotline: process.env.HDP_HOTLINE?.trim() || '',
+    hdpHotline,
     validFrom: process.env.CARD_VALID_FROM?.trim() || '',
     validTo: process.env.CARD_VALID_TO?.trim() || '',
     printBatch: '',
-    showSerial: true,
-    showBatch: true,
+    showSerial: false,
+    showBatch: false,
     serialPrefix: '',
   }
+}
+
+
+function normalizePrimaryColor(value: string | null | undefined): string {
+  const raw = (value ?? '').trim()
+  if (/^#[0-9A-Fa-f]{6}$/.test(raw)) return raw.toUpperCase()
+  if (/^[0-9A-Fa-f]{6}$/.test(raw)) return `#${raw.toUpperCase()}`
+  return '#0B5C6B'
 }
 
 function asDataUrl(value: unknown): string | null {
@@ -666,9 +695,13 @@ export function normalizeCardTemplate(input: Partial<CardTemplate> | null | unde
   const base = defaultCardTemplate()
   if (!input) return base
   const rules = input.rulesText != null ? String(input.rulesText) : base.rulesText
+  const hdpHotline = (input.hdpHotline != null ? String(input.hdpHotline) : base.hdpHotline).trim().slice(0, 80)
+  const hdpPhoneRaw = (input.hdpPhone != null ? String(input.hdpPhone) : base.hdpPhone).trim().slice(0, 80)
   return {
     titleEn: (input.titleEn != null ? String(input.titleEn) : base.titleEn).trim().slice(0, 120) || base.titleEn,
     titleAr: (input.titleAr != null ? String(input.titleAr) : base.titleAr).trim().slice(0, 120) || base.titleAr,
+    projectTitleAr: (input.projectTitleAr != null ? String(input.projectTitleAr) : base.projectTitleAr).trim().slice(0, 120) || base.projectTitleAr,
+    primaryColor: normalizePrimaryColor(input.primaryColor != null ? String(input.primaryColor) : base.primaryColor),
     showWfpLogo: input.showWfpLogo !== false,
     showHdpLogo: input.showHdpLogo !== false,
     wfpLogoDataUrl: input.wfpLogoDataUrl === null ? null : input.wfpLogoDataUrl !== undefined ? asDataUrl(input.wfpLogoDataUrl) : base.wfpLogoDataUrl,
@@ -678,13 +711,21 @@ export function normalizeCardTemplate(input: Partial<CardTemplate> | null | unde
     freeLineAr: (input.freeLineAr != null ? String(input.freeLineAr) : base.freeLineAr).trim().slice(0, 200) || base.freeLineAr,
     complaintsHeadingAr: (input.complaintsHeadingAr != null ? String(input.complaintsHeadingAr) : base.complaintsHeadingAr).trim().slice(0, 120) || base.complaintsHeadingAr,
     hotlineHeadingAr: (input.hotlineHeadingAr != null ? String(input.hotlineHeadingAr) : base.hotlineHeadingAr).trim().slice(0, 80) || base.hotlineHeadingAr,
+    hdpPanelTitleAr: (input.hdpPanelTitleAr != null ? String(input.hdpPanelTitleAr) : base.hdpPanelTitleAr).trim().slice(0, 120) || base.hdpPanelTitleAr,
+    hdpPhone: hdpPhoneRaw || hdpHotline,
+    hdpWhatsapp: (input.hdpWhatsapp != null ? String(input.hdpWhatsapp) : base.hdpWhatsapp).trim().slice(0, 80),
+    partnerPanelTitleAr: (input.partnerPanelTitleAr != null ? String(input.partnerPanelTitleAr) : base.partnerPanelTitleAr).trim().slice(0, 120),
+    partnerPhone: (input.partnerPhone != null ? String(input.partnerPhone) : base.partnerPhone).trim().slice(0, 80),
+    partnerWhatsapp: (input.partnerWhatsapp != null ? String(input.partnerWhatsapp) : base.partnerWhatsapp).trim().slice(0, 80),
+    reassuranceTextAr: (input.reassuranceTextAr != null ? String(input.reassuranceTextAr) : base.reassuranceTextAr).trim().slice(0, 400) || base.reassuranceTextAr,
+    personalNoticeAr: (input.personalNoticeAr != null ? String(input.personalNoticeAr) : base.personalNoticeAr).trim().slice(0, 300) || base.personalNoticeAr,
     wfpHotline: (input.wfpHotline != null ? String(input.wfpHotline) : base.wfpHotline).trim().slice(0, 80),
-    hdpHotline: (input.hdpHotline != null ? String(input.hdpHotline) : base.hdpHotline).trim().slice(0, 80),
+    hdpHotline,
     validFrom: (input.validFrom != null ? String(input.validFrom) : base.validFrom).trim().slice(0, 40),
     validTo: (input.validTo != null ? String(input.validTo) : base.validTo).trim().slice(0, 40),
     printBatch: (input.printBatch != null ? String(input.printBatch) : base.printBatch).trim().slice(0, 60),
-    showSerial: input.showSerial !== false,
-    showBatch: input.showBatch !== false,
+    showSerial: input.showSerial === true,
+    showBatch: input.showBatch === true,
     serialPrefix: (input.serialPrefix != null ? String(input.serialPrefix) : base.serialPrefix).trim().slice(0, 40),
   }
 }
@@ -702,7 +743,11 @@ export async function getCardTemplate(db: Queryable): Promise<CardTemplate> {
 
 export async function saveCardTemplate(db: Database, actor: Actor, input: Partial<CardTemplate>): Promise<CardTemplate> {
   if (actor.role !== 'admin') throw new HttpError(403, 'forbidden')
-  const next = normalizeCardTemplate({ ...(await getCardTemplate(db)), ...input })
+  const merged: Partial<CardTemplate> = { ...(await getCardTemplate(db)), ...input }
+  if (input.showBatch === undefined && input.printBatch != null && String(input.printBatch).trim()) {
+    merged.showBatch = true
+  }
+  const next = normalizeCardTemplate(merged)
   await db.query(
     `INSERT INTO app_settings (key, value_json, updated_at, updated_by)
      VALUES ($1, $2, now(), $3)
@@ -710,6 +755,20 @@ export async function saveCardTemplate(db: Database, actor: Actor, input: Partia
      SET value_json = EXCLUDED.value_json, updated_at = now(), updated_by = EXCLUDED.updated_by`,
     [CARD_TEMPLATE_KEY, JSON.stringify(next), actor.id],
   )
+  await recordAudit(db, {
+    actorId: actor.id,
+    action: 'card_template.save',
+    entityType: 'card_template',
+    entityId: 'card_template',
+    summary: 'Card template updated',
+    detail: {
+      titleAr: next.titleAr,
+      projectTitleAr: next.projectTitleAr,
+      primaryColor: next.primaryColor,
+      validFrom: next.validFrom,
+      validTo: next.validTo,
+    },
+  })
   return next
 }
 
@@ -726,6 +785,8 @@ function cardPrintFields(template: CardTemplate, cardCode: string | null, issued
   return {
     titleEn: template.titleEn,
     titleAr: template.titleAr,
+    projectTitleAr: template.projectTitleAr,
+    primaryColor: template.primaryColor,
     showWfpLogo: template.showWfpLogo,
     showHdpLogo: template.showHdpLogo,
     wfpLogoDataUrl: template.wfpLogoDataUrl,
@@ -735,14 +796,28 @@ function cardPrintFields(template: CardTemplate, cardCode: string | null, issued
     freeLineAr: template.freeLineAr,
     complaintsHeadingAr: template.complaintsHeadingAr,
     hotlineHeadingAr: template.hotlineHeadingAr,
+    hdpPanelTitleAr: template.hdpPanelTitleAr,
+    hdpPhone: template.hdpPhone || template.hdpHotline || null,
+    hdpWhatsapp: template.hdpWhatsapp || null,
+    partnerPanelTitleAr: template.partnerPanelTitleAr || null,
+    partnerPhone: template.partnerPhone || null,
+    partnerWhatsapp: template.partnerWhatsapp || null,
+    reassuranceTextAr: template.reassuranceTextAr,
+    personalNoticeAr: template.personalNoticeAr,
     wfpHotline: template.wfpHotline || null,
-    hdpHotline: template.hdpHotline || null,
+    hdpHotline: template.hdpHotline || template.hdpPhone || null,
     validFrom: template.validFrom || createdDay,
     validTo: template.validTo || null,
     cardSerial: template.showSerial ? serial : null,
-    printBatch: template.showBatch && cardCode ? printBatchId(cardCode, issuedAt, template.printBatch) : null,
+    printBatch: !cardCode
+      ? null
+      : template.printBatch.trim()
+        ? template.printBatch.trim()
+        : template.showBatch
+          ? printBatchId(cardCode, issuedAt, template.printBatch)
+          : null,
     showSerial: template.showSerial,
-    showBatch: template.showBatch,
+    showBatch: template.showBatch || Boolean(template.printBatch.trim()),
   }
 }
 
@@ -793,6 +868,14 @@ export async function createHousehold(
     const names = await dpNames(tx, dpCode)
     const template = await getCardTemplate(tx)
     const issuedAt = new Date().toISOString()
+    await recordAudit(tx, {
+      actorId: actor.id,
+      action: 'household.create',
+      entityType: 'household',
+      entityId: hhCode,
+      summary: `Registered household ${hhCode} at ${dpCode}`,
+      detail: { dpCode, beneficiaryCount: input.beneficiaryCount, label, cardCode },
+    })
     return {
       hhCode,
       dpCode,
@@ -849,6 +932,19 @@ export async function updateHousehold(
        WHERE hh_code = $1`,
       [code, nextDp, nextLabel, nextCount],
     )
+    await recordAudit(tx, {
+      actorId: actor.id,
+      action: 'household.update',
+      entityType: 'household',
+      entityId: code,
+      summary: `Updated household ${code}`,
+      detail: {
+        previousDpCode: currentDp,
+        dpCode: nextDp,
+        label: nextLabel,
+        beneficiaryCount: nextCount,
+      },
+    })
     return {
       hhCode: code,
       dpCode: nextDp,
@@ -891,6 +987,66 @@ export async function listHouseholds(db: Database, actor: Actor, query: { q?: st
     status: String(row.status),
     activeCardCode: row.active_card_code == null ? null : String(row.active_card_code),
   }))
+}
+
+
+export async function listPrintableHouseholds(
+  db: Database,
+  actor: Actor,
+  query: { q?: string; dp?: string; limit?: number } = {},
+) {
+  if (actor.role === 'dp_focal') throw new HttpError(403, 'forbidden')
+  const dps = query.dp ? [query.dp.toUpperCase()] : await accessibleDpCodes(db, actor)
+  for (const code of dps) assertDpAccess(actor, code)
+  if (dps.length === 0) return []
+  const clause = inClause(dps, 1)
+  const params: unknown[] = [...dps]
+  let prefix = ''
+  if (query.q?.trim()) {
+    const raw = query.q.trim()
+    const q = normalizeHhCode(raw).replace(/[%_]/g, '')
+    params.push(`${q}%`)
+    const hhParam = params.length
+    params.push(`%${raw.replace(/[%_]/g, '')}%`)
+    const labelParam = params.length
+    prefix = ` AND (h.hh_code LIKE $${hhParam} OR COALESCE(h.label, '') ILIKE $${labelParam})`
+  }
+  const limit = Math.min(Math.max(Number(query.limit) || 500, 1), 2000)
+  params.push(limit)
+  const rows = await db.query(
+    `SELECT h.hh_code, h.dp_code, h.beneficiary_count, h.label, h.status, h.active_card_code, h.created_at,
+            dp.name_en, dp.name_ar,
+            (
+              SELECT ci.created_at FROM card_issuance ci
+              WHERE ci.hh_code = h.hh_code AND ci.action IN ('issue', 'reissue')
+              ORDER BY ci.created_at DESC LIMIT 1
+            ) AS issued_at
+     FROM households h
+     LEFT JOIN distribution_points dp ON dp.code = h.dp_code
+     WHERE h.dp_code IN (${clause.sql})${prefix}
+       AND h.active_card_code IS NOT NULL
+     ORDER BY h.hh_code
+     LIMIT $${params.length}`,
+    params,
+  )
+  const template = await getCardTemplate(db)
+  return rows.map((row) => {
+    const activeCard = String(row.active_card_code)
+    const issuedAt = asText(row.issued_at) ?? asText(row.created_at)
+    const createdDay = (asText(row.created_at) ?? '').slice(0, 10) || adenDate()
+    return {
+      hhCode: String(row.hh_code),
+      dpCode: String(row.dp_code),
+      beneficiaryCount: Number(row.beneficiary_count),
+      label: row.label == null ? null : String(row.label),
+      status: String(row.status),
+      activeCardCode: activeCard,
+      dpNameEn: row.name_en == null ? String(row.dp_code) : String(row.name_en),
+      dpNameAr: row.name_ar == null ? String(row.dp_code) : String(row.name_ar),
+      holderName: row.label == null ? null : String(row.label),
+      ...cardPrintFields(template, activeCard, issuedAt, createdDay),
+    }
+  })
 }
 
 export async function getHousehold(db: Database, actor: Actor, hhCode: string) {
@@ -950,6 +1106,14 @@ export async function voidCard(db: Database, actor: Actor, hhCode: string, reaso
        VALUES ($1, $2, $3, 'void', $4, $5)`,
       [crypto.randomUUID(), code, active, trimmed, actor.id],
     )
+    await recordAudit(tx, {
+      actorId: actor.id,
+      action: 'card.void',
+      entityType: 'card',
+      entityId: code,
+      summary: `Voided card for ${code}`,
+      detail: { cardCode: active, reason: trimmed },
+    })
     return { hhCode: code, voidedCardCode: active }
   })
 }
@@ -982,6 +1146,14 @@ export async function reissueCard(db: Database, actor: Actor, hhCode: string, re
        VALUES ($1, $2, $3, 'reissue', $4, $5, $6)`,
       [crypto.randomUUID(), code, cardCode, trimmed, previous, actor.id],
     )
+    await recordAudit(tx, {
+      actorId: actor.id,
+      action: 'card.reissue',
+      entityType: 'card',
+      entityId: code,
+      summary: `Reissued card for ${code}`,
+      detail: { cardCode, previousCardCode: previous, reason: trimmed },
+    })
     return { hhCode: code, cardCode, payload: cardPayload(cardCode, code), previousCardCode: previous }
   })
 }
@@ -1016,6 +1188,23 @@ export async function upsertProduction(
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
     [crypto.randomUUID(), dpCode, input.productionDate, input.mealsPrepared, previous, actor.id, notes],
   )
+  await recordAudit(db, {
+    actorId: actor.id,
+    action: previous == null ? 'production.create' : 'production.update',
+    entityType: 'production',
+    entityId: `${dpCode}:${input.productionDate}`,
+    summary:
+      previous == null
+        ? `Meals prepared set to ${input.mealsPrepared} at ${dpCode} (${input.productionDate})`
+        : `Meals prepared ${previous} → ${input.mealsPrepared} at ${dpCode} (${input.productionDate})`,
+    detail: {
+      dpCode,
+      productionDate: input.productionDate,
+      mealsPrepared: input.mealsPrepared,
+      previousMealsPrepared: previous,
+      notes,
+    },
+  })
   return {
     dpCode,
     productionDate: input.productionDate,
@@ -1087,6 +1276,14 @@ export async function createSpotCheck(
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
     [id, dpCode, adenDate(), actor.id, hhCode, finding.slice(0, 80), cleanLabel(input.notes)],
   )
+  await recordAudit(db, {
+    actorId: actor.id,
+    action: 'spot_check.create',
+    entityType: 'spot_check',
+    entityId: id,
+    summary: `Spot check at ${dpCode}: ${finding.slice(0, 80)}`,
+    detail: { dpCode, hhCode, finding: finding.slice(0, 80), notes: cleanLabel(input.notes) },
+  })
   return { id, dpCode, finding }
 }
 
@@ -1236,6 +1433,7 @@ export async function createDp(
     gpsRadiusM?: number | null
     gpsCheckActive?: boolean | null
   },
+  actor?: Actor | null,
 ) {
   const code = normalizeDpCode(input.code)
   const nameEn = input.nameEn.trim()
@@ -1255,6 +1453,16 @@ export async function createDp(
   } catch (error) {
     if (isUniqueViolation(error)) throw new HttpError(409, 'dp_code_taken')
     throw error
+  }
+  if (actor) {
+    await recordAudit(db, {
+      actorId: actor.id,
+      action: 'dp.create',
+      entityType: 'distribution_point',
+      entityId: code,
+      summary: `Created distribution point ${code}`,
+      detail: { nameEn, nameAr, district: input.district, active, ...gps },
+    })
   }
   return {
     code,
@@ -1303,6 +1511,7 @@ export async function patchDp(
     gpsRadiusM?: number | null
     gpsCheckActive?: boolean | null
   },
+  actor?: Actor | null,
 ) {
   const currentCode = code.trim().toUpperCase()
   const current = await db.query(
@@ -1334,6 +1543,27 @@ export async function patchDp(
   if (input.userIds) await replaceDpAssignments(db, currentCode, input.userIds)
   const listed = await listDps(db)
   const row = listed.find((item) => item.code === currentCode)
+  if (actor) {
+    await recordAudit(db, {
+      actorId: actor.id,
+      action: 'dp.update',
+      entityType: 'distribution_point',
+      entityId: currentCode,
+      summary: `Updated distribution point ${currentCode}`,
+      detail: {
+        nameEn,
+        nameAr,
+        district,
+        active,
+        latitude: gps.latitude,
+        longitude: gps.longitude,
+        gpsRadiusM: gps.gpsRadiusM,
+        gpsCheckActive: gps.gpsCheckActive,
+        userIds: input.userIds ?? null,
+        renamedFrom: code.trim().toUpperCase() !== currentCode ? code : null,
+      },
+    })
+  }
   return (
     row ?? {
       code: currentCode,
@@ -1381,9 +1611,205 @@ async function assertNotLastAdmin(db: Queryable, id: string) {
   if (others.length === 0) throw new HttpError(400, 'last_admin')
 }
 
+
+export type AuditEntityType =
+  | 'household'
+  | 'card'
+  | 'production'
+  | 'user'
+  | 'distribution_point'
+  | 'card_template'
+  | 'spot_check'
+  | 'device'
+  | 'system'
+
+export interface AuditEntryInput {
+  actorId: string | null
+  action: string
+  entityType: AuditEntityType
+  entityId?: string | null
+  summary: string
+  detail?: Record<string, unknown>
+}
+
+export async function recordAudit(db: Queryable, entry: AuditEntryInput): Promise<void> {
+  try {
+    await db.query(
+      `INSERT INTO audit_log (id, actor_id, action, entity_type, entity_id, summary, detail_json)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        crypto.randomUUID(),
+        entry.actorId,
+        entry.action.slice(0, 80),
+        entry.entityType.slice(0, 40),
+        entry.entityId == null ? null : String(entry.entityId).slice(0, 120),
+        entry.summary.trim().slice(0, 400) || entry.action,
+        JSON.stringify(entry.detail ?? {}),
+      ],
+    )
+  } catch {
+    // Never fail the primary write because audit insert failed (e.g. pre-migration).
+  }
+}
+
+export async function listAdminActivity(
+  db: Database,
+  query: { q?: string; entityType?: string; limit?: number } = {},
+) {
+  const limit = Math.min(Math.max(Number(query.limit) || 200, 1), 500)
+  const params: unknown[] = []
+  const filters: string[] = []
+  if (query.entityType?.trim()) {
+    params.push(query.entityType.trim())
+    filters.push(`a.entity_type = $${params.length}`)
+  }
+  if (query.q?.trim()) {
+    const raw = `%${query.q.trim().replace(/[%_]/g, '')}%`
+    params.push(raw)
+    const p = params.length
+    filters.push(
+      `(a.summary ILIKE $${p} OR COALESCE(a.entity_id, '') ILIKE $${p} OR COALESCE(u.username, '') ILIKE $${p} OR COALESCE(u.display_name, '') ILIKE $${p} OR a.action ILIKE $${p})`,
+    )
+  }
+  const where = filters.length ? `WHERE ${filters.join(' AND ')}` : ''
+  params.push(limit)
+  let rows: Row[] = []
+  try {
+    rows = await db.query(
+      `SELECT a.id, a.created_at, a.actor_id, a.action, a.entity_type, a.entity_id, a.summary, a.detail_json,
+              u.username, u.display_name, u.role
+       FROM audit_log a
+       LEFT JOIN users u ON u.id = a.actor_id
+       ${where}
+       ORDER BY a.created_at DESC
+       LIMIT $${params.length}`,
+      params,
+    )
+  } catch {
+    rows = []
+  }
+
+  // Supplement with recent production + card issuance so the feed is useful before new audits accumulate.
+  const extras: Array<Record<string, unknown>> = []
+  if (!query.entityType || query.entityType === 'production') {
+    const prod = await db.query(
+      `SELECT h.id, h.created_at, h.recorded_by AS actor_id, h.dp_code, h.production_date,
+              h.meals_prepared, h.previous_meals_prepared, h.notes, u.username, u.display_name, u.role
+       FROM daily_production_history h
+       LEFT JOIN users u ON u.id = h.recorded_by
+       ORDER BY h.created_at DESC LIMIT 80`,
+    )
+    for (const row of prod) {
+      const prev = row.previous_meals_prepared == null ? null : Number(row.previous_meals_prepared)
+      const next = Number(row.meals_prepared)
+      extras.push({
+        id: `prod:${row.id}`,
+        createdAt: asText(row.created_at),
+        actorId: row.actor_id == null ? null : String(row.actor_id),
+        actorUsername: row.username == null ? null : String(row.username),
+        actorDisplayName: row.display_name == null ? null : String(row.display_name),
+        actorRole: row.role == null ? null : String(row.role),
+        action: prev == null ? 'production.create' : 'production.update',
+        entityType: 'production',
+        entityId: `${row.dp_code}:${row.production_date}`,
+        summary:
+          prev == null
+            ? `Meals prepared set to ${next} at ${row.dp_code} (${row.production_date})`
+            : `Meals prepared ${prev} → ${next} at ${row.dp_code} (${row.production_date})`,
+        detail: {
+          dpCode: String(row.dp_code),
+          productionDate: String(row.production_date),
+          mealsPrepared: next,
+          previousMealsPrepared: prev,
+          notes: row.notes == null ? null : String(row.notes),
+          source: 'daily_production_history',
+        },
+        source: 'legacy',
+      })
+    }
+  }
+  if (!query.entityType || query.entityType === 'card' || query.entityType === 'household') {
+    const cards = await db.query(
+      `SELECT c.id, c.created_at, c.operator_id AS actor_id, c.hh_code, c.card_code, c.action, c.reason,
+              c.previous_card_code, u.username, u.display_name, u.role
+       FROM card_issuance c
+       LEFT JOIN users u ON u.id = c.operator_id
+       ORDER BY c.created_at DESC LIMIT 80`,
+    )
+    for (const row of cards) {
+      const action = String(row.action)
+      extras.push({
+        id: `card:${row.id}`,
+        createdAt: asText(row.created_at),
+        actorId: row.actor_id == null ? null : String(row.actor_id),
+        actorUsername: row.username == null ? null : String(row.username),
+        actorDisplayName: row.display_name == null ? null : String(row.display_name),
+        actorRole: row.role == null ? null : String(row.role),
+        action: `card.${action}`,
+        entityType: 'card',
+        entityId: String(row.hh_code),
+        summary: `Card ${action} for ${row.hh_code}${row.reason ? ` — ${row.reason}` : ''}`,
+        detail: {
+          hhCode: String(row.hh_code),
+          cardCode: String(row.card_code),
+          previousCardCode: row.previous_card_code == null ? null : String(row.previous_card_code),
+          reason: row.reason == null ? null : String(row.reason),
+          source: 'card_issuance',
+        },
+        source: 'legacy',
+      })
+    }
+  }
+
+  const qLower = query.q?.trim().toLowerCase() || ''
+  const primary = rows.map((row) => {
+    let detail: Record<string, unknown> = {}
+    try {
+      detail = JSON.parse(String(row.detail_json || '{}')) as Record<string, unknown>
+    } catch {
+      detail = {}
+    }
+    return {
+      id: String(row.id),
+      createdAt: asText(row.created_at),
+      actorId: row.actor_id == null ? null : String(row.actor_id),
+      actorUsername: row.username == null ? null : String(row.username),
+      actorDisplayName: row.display_name == null ? null : String(row.display_name),
+      actorRole: row.role == null ? null : String(row.role),
+      action: String(row.action),
+      entityType: String(row.entity_type),
+      entityId: row.entity_id == null ? null : String(row.entity_id),
+      summary: String(row.summary),
+      detail,
+      source: 'audit_log',
+    }
+  })
+
+  const filteredExtras = extras.filter((row) => {
+    if (!qLower) return true
+    const blob = `${row.summary} ${row.entityId} ${row.actorUsername} ${row.actorDisplayName} ${row.action}`.toLowerCase()
+    return blob.includes(qLower)
+  })
+
+  const merged = [...primary, ...filteredExtras].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+  // Dedupe legacy card/production once mirrored into audit_log (same summary+time minute+entity)
+  const seen = new Set<string>()
+  const out = []
+  for (const row of merged) {
+    const key = `${row.source}:${row.id}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(row)
+    if (out.length >= limit) break
+  }
+  return out
+}
+
+
 export async function createUser(
   db: Database,
   input: { username: string; displayName: string; password: string; role: Role; dpCodes: string[]; pin?: string | null },
+  actor?: Actor | null,
 ) {
   const username = input.username.trim().toLowerCase()
   if (input.role === 'supervisor' && !input.pin) throw new HttpError(400, 'pin_required')
@@ -1402,6 +1828,16 @@ export async function createUser(
       await tx.query(`INSERT INTO user_dps (user_id, dp_code) VALUES ($1, $2)`, [id, dpCode.toUpperCase()])
     }
   })
+  if (actor) {
+    await recordAudit(db, {
+      actorId: actor.id,
+      action: 'user.create',
+      entityType: 'user',
+      entityId: id,
+      summary: `Created user ${username} (${input.role})`,
+      detail: { username, role: input.role, dpCodes: input.dpCodes, displayName: input.displayName.trim() },
+    })
+  }
   return { id, username }
 }
 
@@ -1415,7 +1851,7 @@ export interface UserUpdate {
   active?: boolean
 }
 
-export async function updateUser(db: Database, id: string, input: UserUpdate) {
+export async function updateUser(db: Database, id: string, input: UserUpdate, actor?: Actor | null) {
   const rows = await db.query<{ role: string; pin_hash: string | null }>(`SELECT role, pin_hash FROM users WHERE id = $1`, [id])
   const current = rows[0]
   if (!current) throw new HttpError(404, 'not_found')
@@ -1444,6 +1880,24 @@ export async function updateUser(db: Database, id: string, input: UserUpdate) {
       }
     }
   })
+  if (actor) {
+    await recordAudit(db, {
+      actorId: actor.id,
+      action: 'user.update',
+      entityType: 'user',
+      entityId: id,
+      summary: `Updated user ${id}`,
+      detail: {
+        displayName: input.displayName ?? null,
+        username: input.username ?? null,
+        role: input.role ?? null,
+        active: input.active ?? null,
+        dpCodes: input.dpCodes ?? null,
+        passwordChanged: Boolean(input.password),
+        pinChanged: input.pin !== undefined,
+      },
+    })
+  }
   return { id }
 }
 
@@ -1467,6 +1921,14 @@ export async function deleteUser(db: Database, actorId: string, id: string) {
     await tx.query(`UPDATE devices SET last_user_id = NULL WHERE last_user_id = $1`, [id])
     await tx.query(`UPDATE sync_log SET operator_id = NULL WHERE operator_id = $1`, [id])
     await tx.query(`DELETE FROM users WHERE id = $1`, [id])
+  })
+  await recordAudit(db, {
+    actorId: actorId,
+    action: 'user.delete',
+    entityType: 'user',
+    entityId: id,
+    summary: `Deleted user ${id}`,
+    detail: { role: String(rows[0].role) },
   })
   return { id }
 }

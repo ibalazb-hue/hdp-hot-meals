@@ -90,9 +90,282 @@ textarea {
   font-variant-numeric: tabular-nums;
 }
 
+/* Arabic entitlement card — credit-card landscape (~85.6 × 54 mm) */
+.entitlement-card-mm {
+  --card-teal: #0b5c6b;
+  position: relative;
+  width: 100%;
+  max-width: 86mm;
+  aspect-ratio: 1.585 / 1;
+  overflow: hidden;
+  border: 1px solid #c5d2d4;
+  background: #fff;
+  box-shadow: var(--shadow-card);
+}
+
+.card-teal-band {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 3.2mm;
+  background: var(--card-teal);
+}
+
+.card-front-body,
+.card-back-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 5mm 4mm 3.5mm;
+  box-sizing: border-box;
+}
+
+.card-logo-row {
+  flex: 0 0 auto;
+  margin-bottom: 2mm;
+}
+
+.card-front-columns {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 3mm;
+  min-height: 0;
+}
+
+.card-front-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.card-main-title {
+  margin: 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #0f1c24;
+}
+
+.card-project-title {
+  margin: 1mm 0 2.5mm;
+  text-align: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--card-teal);
+}
+
+.card-fields {
+  display: grid;
+  gap: 2.2mm;
+  flex: 1 1 auto;
+}
+
+.card-field-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: end;
+  gap: 2mm;
+  border-bottom: 1px solid #b7c4c7;
+  padding-bottom: 0.8mm;
+  min-height: 5mm;
+}
+
+.card-field-label {
+  font-size: 8px;
+  font-weight: 700;
+  color: #5a6b73;
+  white-space: nowrap;
+}
+
+.card-field-value {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-align: start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-dates {
+  margin-top: 2mm;
+  font-size: 8px;
+  font-weight: 600;
+  color: #5a6b73;
+  text-align: center;
+}
+
+.card-front-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.card-qr-img {
+  width: 28mm;
+  height: 28mm;
+  border: 1.5px solid #0f1c24;
+  background: #fff;
+  object-fit: contain;
+}
+
+.card-qr-placeholder {
+  width: 28mm;
+  height: 28mm;
+  border: 1.5px dashed #9aaeb3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #5a6b73;
+}
+
+.card-hh-code {
+  margin: 1.5mm 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.card-back-header {
+  text-align: center;
+  margin-bottom: 2mm;
+}
+
+.card-back-title {
+  margin: 0;
+  background: var(--card-teal);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1.6mm 2mm;
+  border-radius: 1mm;
+}
+
+.card-hotline-label {
+  margin: 1.4mm 0 0;
+  font-size: 8.5px;
+  font-weight: 800;
+  color: var(--card-teal);
+}
+
+.card-hotline-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2mm;
+  margin-bottom: 2mm;
+}
+
+.card-hotline-panel {
+  border: 1px solid var(--card-teal);
+  border-radius: 1.5mm;
+  padding: 1.5mm 2mm;
+  min-height: 16mm;
+}
+
+.card-hotline-panel-title {
+  font-size: 7.5px;
+  font-weight: 800;
+  color: var(--card-teal);
+  margin-bottom: 1.2mm;
+  min-height: 2.4mm;
+  border-bottom: 1px solid #d5e2e4;
+  padding-bottom: 0.8mm;
+}
+
+.card-hotline-row {
+  display: flex;
+  align-items: center;
+  gap: 1.5mm;
+  font-size: 8px;
+  font-weight: 700;
+  margin-top: 1.2mm;
+  color: #0f1c24;
+}
+
+.card-icon {
+  width: 3.2mm;
+  height: 3.2mm;
+  flex: 0 0 auto;
+  color: var(--card-teal);
+}
+
+.card-reassurance {
+  margin: 0 0 1.2mm;
+  font-size: 7.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: center;
+  color: #0f1c24;
+}
+
+.card-personal-notice {
+  margin: 0;
+  font-size: 7px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  color: #5a6b73;
+}
+
+.card-meta {
+  display: flex;
+  justify-content: center;
+  gap: 4mm;
+  margin: 1.5mm 0 0;
+  font-size: 6.5px;
+  color: #5a6b73;
+}
+
+.card-meta dt {
+  display: inline;
+  font-weight: 600;
+}
+
+.card-meta dd {
+  display: inline;
+  margin: 0 0 0 1mm;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 700;
+}
+
+.bulk-print-sheet {
+  display: none;
+}
+
+.bulk-print-sheet.is-active {
+  display: block;
+}
+
+.a4-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-evenly;
+  gap: 6mm;
+  padding: 4mm 0;
+}
+
+.a4-page .entitlement-print {
+  max-width: none;
+  margin: 0;
+}
+
+.a4-page .entitlement-face {
+  margin: 0;
+}
+
 @media print {
   @page {
-    margin: 10mm;
+    size: A4 portrait;
+    margin: 8mm;
   }
   body {
     background: white !important;
@@ -100,36 +373,73 @@ textarea {
   .no-print {
     display: none !important;
   }
-  /* Print only the entitlement card faces */
   body * {
     visibility: hidden !important;
   }
   .entitlement-print,
-  .entitlement-print * {
+  .entitlement-print *,
+  .bulk-print-sheet,
+  .bulk-print-sheet *,
+  .a4-page,
+  .a4-page * {
     visibility: visible !important;
   }
-  .entitlement-print {
-    position: absolute;
-    inset: 0;
-    width: 100%;
+  .entitlement-print,
+  .bulk-print-sheet {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
     padding: 0 !important;
     background: white;
   }
+  .bulk-print-sheet {
+    display: block !important;
+  }
+  .a4-page {
+    width: 100%;
+    min-height: 277mm;
+    height: 277mm;
+    box-sizing: border-box;
+    page-break-after: always;
+    break-after: page;
+    justify-content: space-evenly;
+    gap: 8mm;
+    padding: 0;
+  }
+  .a4-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
   .entitlement-face {
     break-inside: avoid;
     page-break-inside: avoid;
+    page-break-after: avoid !important;
     box-shadow: none !important;
     border-radius: 0 !important;
-    max-width: 105mm;
-    margin: 0 auto;
-    padding: 5mm !important;
+    width: 85.6mm !important;
+    max-width: 85.6mm !important;
+    height: 54mm !important;
+    aspect-ratio: auto;
+    margin: 0 auto !important;
+    padding: 0 !important;
   }
-  .entitlement-front {
-    page-break-after: avoid;
+  /* Single-card print: one face per A4 page */
+  .entitlement-print:not(.bulk-card) .entitlement-front {
+    page-break-after: always;
   }
-  img {
+  .entitlement-print:not(.bulk-card) .entitlement-back {
+    page-break-after: auto;
+  }
+  .a4-page .entitlement-front,
+  .a4-page .entitlement-back {
+    page-break-after: avoid !important;
+  }
+  img,
+  .card-teal-band,
+  .card-back-title,
+  .card-hotline-panel {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }

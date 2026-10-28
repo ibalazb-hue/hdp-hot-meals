@@ -8,6 +8,8 @@ import { Alert, Button, Field, Panel, TextInput } from './ui'
 export interface CardTemplateForm {
   titleEn: string
   titleAr: string
+  projectTitleAr: string
+  primaryColor: string
   showWfpLogo: boolean
   showHdpLogo: boolean
   wfpLogoDataUrl: string | null
@@ -17,6 +19,14 @@ export interface CardTemplateForm {
   freeLineAr: string
   complaintsHeadingAr: string
   hotlineHeadingAr: string
+  hdpPanelTitleAr: string
+  hdpPhone: string
+  hdpWhatsapp: string
+  partnerPanelTitleAr: string
+  partnerPhone: string
+  partnerWhatsapp: string
+  reassuranceTextAr: string
+  personalNoticeAr: string
   wfpHotline: string
   hdpHotline: string
   validFrom: string
@@ -108,11 +118,29 @@ export function CardTemplateAdmin() {
           <h2 className="text-lg font-bold">{t('cardTemplate')}</h2>
           <p className="text-sm text-muted">{t('cardTemplateHint')}</p>
 
-          <Field label={t('cardTitleEn')}>
-            <TextInput value={form.titleEn} maxLength={120} onChange={(e) => patch('titleEn', e.target.value)} />
-          </Field>
           <Field label={t('cardTitleAr')}>
             <TextInput dir="rtl" value={form.titleAr} maxLength={120} onChange={(e) => patch('titleAr', e.target.value)} />
+          </Field>
+          <Field label={t('projectTitleAr')}>
+            <TextInput dir="rtl" value={form.projectTitleAr} maxLength={120} onChange={(e) => patch('projectTitleAr', e.target.value)} />
+          </Field>
+          <Field label={t('primaryColor')} hint={t('primaryColorHint')}>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                data-testid="card-primary-color"
+                value={/^#[0-9A-Fa-f]{6}$/.test(form.primaryColor) ? form.primaryColor : '#0B5C6B'}
+                onChange={(e) => patch('primaryColor', e.target.value.toUpperCase())}
+                className="h-11 w-14 cursor-pointer rounded-xl border border-line bg-white p-1"
+              />
+              <TextInput
+                dir="ltr"
+                value={form.primaryColor}
+                maxLength={7}
+                onChange={(e) => patch('primaryColor', e.target.value.toUpperCase())}
+                placeholder="#0B5C6B"
+              />
+            </div>
           </Field>
 
           <div className="grid gap-2 rounded-2xl border border-line p-3 sm:grid-cols-2">
@@ -146,33 +174,63 @@ export function CardTemplateAdmin() {
             </Field>
           </div>
 
-          <Field label={t('cardRulesText')} hint={t('cardRulesHint')}>
-            <textarea
-              className="min-h-28 w-full rounded-2xl border border-line bg-white px-3 py-2 text-sm"
-              value={form.rulesText}
-              maxLength={2000}
-              onChange={(e) => patch('rulesText', e.target.value)}
-            />
-          </Field>
-          <Field label={t('freeLineEn')}>
-            <TextInput value={form.freeLineEn} maxLength={200} onChange={(e) => patch('freeLineEn', e.target.value)} />
-          </Field>
-          <Field label={t('freeLineAr')}>
-            <TextInput dir="rtl" value={form.freeLineAr} maxLength={200} onChange={(e) => patch('freeLineAr', e.target.value)} />
-          </Field>
           <Field label={t('complaintsHeadingAr')}>
             <TextInput dir="rtl" value={form.complaintsHeadingAr} maxLength={120} onChange={(e) => patch('complaintsHeadingAr', e.target.value)} />
           </Field>
           <Field label={t('hotlineHeadingAr')}>
             <TextInput dir="rtl" value={form.hotlineHeadingAr} maxLength={80} onChange={(e) => patch('hotlineHeadingAr', e.target.value)} />
           </Field>
+
+          <div className="grid gap-3 rounded-2xl border border-line p-3">
+            <p className="text-sm font-bold">{t('hdpHotlinePanel')}</p>
+            <Field label={t('hdpPanelTitleAr')}>
+              <TextInput dir="rtl" value={form.hdpPanelTitleAr} maxLength={120} onChange={(e) => patch('hdpPanelTitleAr', e.target.value)} />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label={t('hdpPhone')}>
+                <TextInput dir="ltr" value={form.hdpPhone} maxLength={80} onChange={(e) => patch('hdpPhone', e.target.value)} />
+              </Field>
+              <Field label={t('hdpWhatsapp')}>
+                <TextInput dir="ltr" value={form.hdpWhatsapp} maxLength={80} onChange={(e) => patch('hdpWhatsapp', e.target.value)} />
+              </Field>
+            </div>
+          </div>
+
+          <div className="grid gap-3 rounded-2xl border border-line p-3">
+            <p className="text-sm font-bold">{t('partnerHotlinePanel')}</p>
+            <Field label={t('partnerPanelTitleAr')}>
+              <TextInput dir="rtl" value={form.partnerPanelTitleAr} maxLength={120} onChange={(e) => patch('partnerPanelTitleAr', e.target.value)} />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label={t('partnerPhone')}>
+                <TextInput dir="ltr" value={form.partnerPhone} maxLength={80} onChange={(e) => patch('partnerPhone', e.target.value)} />
+              </Field>
+              <Field label={t('partnerWhatsapp')}>
+                <TextInput dir="ltr" value={form.partnerWhatsapp} maxLength={80} onChange={(e) => patch('partnerWhatsapp', e.target.value)} />
+              </Field>
+            </div>
+          </div>
+
+          <Field label={t('reassuranceTextAr')}>
+            <textarea
+              dir="rtl"
+              className="min-h-20 w-full rounded-2xl border border-line bg-white px-3 py-2 text-sm"
+              value={form.reassuranceTextAr}
+              maxLength={400}
+              onChange={(e) => patch('reassuranceTextAr', e.target.value)}
+            />
+          </Field>
+          <Field label={t('personalNoticeAr')}>
+            <textarea
+              dir="rtl"
+              className="min-h-16 w-full rounded-2xl border border-line bg-white px-3 py-2 text-sm"
+              value={form.personalNoticeAr}
+              maxLength={300}
+              onChange={(e) => patch('personalNoticeAr', e.target.value)}
+            />
+          </Field>
+
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label={t('wfpHotline')}>
-              <TextInput dir="ltr" value={form.wfpHotline} maxLength={80} onChange={(e) => patch('wfpHotline', e.target.value)} />
-            </Field>
-            <Field label={t('hdpHotline')}>
-              <TextInput dir="ltr" value={form.hdpHotline} maxLength={80} onChange={(e) => patch('hdpHotline', e.target.value)} />
-            </Field>
             <Field label={t('validFrom')}>
               <TextInput dir="ltr" value={form.validFrom} maxLength={40} placeholder="YYYY-MM-DD" onChange={(e) => patch('validFrom', e.target.value)} />
             </Field>
@@ -209,24 +267,28 @@ export function CardTemplateAdmin() {
         <p className="text-sm font-bold text-muted">{t('cardPreview')}</p>
         <QrCard
           hhCode="TZ-MDF01-000001"
-          holderName="Sample Holder"
+          holderName="عيّنة مستفيد"
           dpCode="MDF01"
           dpNameEn="Sample point"
-          dpNameAr="نقطة تجريبية"
+          dpNameAr="المظفر"
           beneficiaryCount={5}
-          titleEn={form.titleEn}
           titleAr={form.titleAr}
+          projectTitleAr={form.projectTitleAr}
+          primaryColor={form.primaryColor}
           showWfpLogo={form.showWfpLogo}
           showHdpLogo={form.showHdpLogo}
           wfpLogoDataUrl={form.wfpLogoDataUrl}
           hdpLogoDataUrl={form.hdpLogoDataUrl}
-          rulesText={form.rulesText}
-          freeLineEn={form.freeLineEn}
-          freeLineAr={form.freeLineAr}
           complaintsHeadingAr={form.complaintsHeadingAr}
           hotlineHeadingAr={form.hotlineHeadingAr}
-          wfpHotline={form.wfpHotline}
-          hdpHotline={form.hdpHotline}
+          hdpPanelTitleAr={form.hdpPanelTitleAr}
+          hdpPhone={form.hdpPhone}
+          hdpWhatsapp={form.hdpWhatsapp}
+          partnerPanelTitleAr={form.partnerPanelTitleAr}
+          partnerPhone={form.partnerPhone}
+          partnerWhatsapp={form.partnerWhatsapp}
+          reassuranceTextAr={form.reassuranceTextAr}
+          personalNoticeAr={form.personalNoticeAr}
           validFrom={form.validFrom || '2026-01-01'}
           validTo={form.validTo || '2026-12-31'}
           cardSerial={`${form.serialPrefix}CSAMPLE001`}
