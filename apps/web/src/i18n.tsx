@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 export const en = {
-  appName: 'HDP meal verification',
+  appName: 'Humanitarian Community Kitchen – Hot Cooked Meals',
   appPlace: 'Taiz · Al-Mudhaffar & Al-Qahira',
   login: 'Sign in',
   username: 'Username',
@@ -262,7 +262,7 @@ export const en = {
 }
 
 const ar: Record<keyof typeof en, string> = {
-  appName: 'التحقق من صرف الوجبة الساخنة',
+  appName: 'المطبخ المجتمعي الإنساني – وجبات مطبوخة ساخنة',
   appPlace: 'تعز · المظفر والقاهرة',
   login: 'دخول',
   username: 'اسم المستخدم',
@@ -540,6 +540,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.lang = locale
     document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr'
+    document.title = locale === 'ar' ? ar.appName : en.appName
   }, [locale])
   const value = useMemo(() => ({ locale, setLocale, t: (key: CopyKey) => (locale === 'ar' ? ar[key] ?? en[key] : en[key]) }), [locale])
   return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>

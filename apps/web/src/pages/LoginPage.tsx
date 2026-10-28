@@ -38,7 +38,7 @@ export function LoginPage() {
             <div className="inline-flex rounded-2xl bg-white p-3 shadow-[var(--shadow-card)]">
               <BrandLogos className="h-12" />
             </div>
-            <h1 className="mt-4 text-3xl font-bold leading-tight tracking-tight text-ink">{t('appName')}</h1>
+            <h1 className="mt-4 text-2xl font-bold leading-snug tracking-tight text-ink sm:text-3xl">{t('appName')}</h1>
             <p className="mt-1 text-sm text-muted">{t('appPlace')}</p>
             <p className="mt-2 text-sm font-semibold text-teal">{t('loginTagline')}</p>
           </div>

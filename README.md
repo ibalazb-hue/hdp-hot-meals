@@ -1,4 +1,4 @@
-# HDP meal verification — Taiz
+# Humanitarian Community Kitchen – Hot Cooked Meals
 
 Offline-capable tablet PWA for one hot meal per household per day in Al-Mudhaffar and Al-Qahira. Cards replace fingerprints. The calendar day is Asia/Aden.
 

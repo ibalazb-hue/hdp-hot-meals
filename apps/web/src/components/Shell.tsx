@@ -98,7 +98,7 @@ export function Shell() {
           </button>
           <div className="flex items-start justify-between gap-3 px-4 pt-3">
             <button className="min-w-0 flex-1 text-start" onClick={() => navigate('/')}>
-              <span className="block truncate text-lg font-bold leading-tight">{t('appName')}</span>
+              <span className="block text-sm font-bold leading-snug sm:text-base">{t('appName')}</span>
               <span className="block truncate text-xs text-white/70">{t('appPlace')}</span>
             </button>
             <RoleBadge role={role} label={t(ROLE_LABEL[role])} />
