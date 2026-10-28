@@ -601,19 +601,141 @@ function requireWriter(actor: Actor): void {
 }
 
 
-export function cardPrintSettings() {
+export interface CardTemplate {
+  titleEn: string
+  titleAr: string
+  showWfpLogo: boolean
+  showHdpLogo: boolean
+  wfpLogoDataUrl: string | null
+  hdpLogoDataUrl: string | null
+  rulesText: string
+  freeLineEn: string
+  freeLineAr: string
+  wfpHotline: string
+  hdpHotline: string
+  validFrom: string
+  validTo: string
+  printBatch: string
+  showSerial: boolean
+  showBatch: boolean
+  serialPrefix: string
+}
+
+const CARD_TEMPLATE_KEY = 'card_template'
+const MAX_LOGO_CHARS = 350_000
+
+export function defaultCardTemplate(): CardTemplate {
   return {
-    validFrom: process.env.CARD_VALID_FROM?.trim() || null,
-    validTo: process.env.CARD_VALID_TO?.trim() || null,
-    wfpHotline: process.env.WFP_HOTLINE?.trim() || null,
-    hdpHotline: process.env.HDP_HOTLINE?.trim() || null,
+    titleEn: 'Hot Meal Entitlement Card – Free of Charge',
+    titleAr: 'بطاقة استحقاق وجبة ساخنة – مجاناً',
+    showWfpLogo: true,
+    showHdpLogo: true,
+    wfpLogoDataUrl: null,
+    hdpLogoDataUrl: null,
+    rulesText:
+      'One meal per household per day.\nThis card is personal and not for sale.\nReport loss at the help desk.',
+    freeLineEn: 'Assistance is FREE – do not pay anyone.',
+    freeLineAr: 'المساعدة مجانية — لا تدفع لأي شخص',
+    wfpHotline: process.env.WFP_HOTLINE?.trim() || '',
+    hdpHotline: process.env.HDP_HOTLINE?.trim() || '',
+    validFrom: process.env.CARD_VALID_FROM?.trim() || '',
+    validTo: process.env.CARD_VALID_TO?.trim() || '',
+    printBatch: '',
+    showSerial: true,
+    showBatch: true,
+    serialPrefix: '',
   }
 }
 
-function printBatchId(cardCode: string, issuedAt: string | null | undefined): string {
+function asDataUrl(value: unknown): string | null {
+  if (value == null) return null
+  const text = String(value).trim()
+  if (!text) return null
+  if (!/^data:image\/(png|jpe?g|webp|svg\+xml);base64,[A-Za-z0-9+/=\s]+$/i.test(text)) {
+    throw new HttpError(400, 'invalid_logo')
+  }
+  if (text.length > MAX_LOGO_CHARS) throw new HttpError(400, 'logo_too_large')
+  return text
+}
+
+export function normalizeCardTemplate(input: Partial<CardTemplate> | null | undefined): CardTemplate {
+  const base = defaultCardTemplate()
+  if (!input) return base
+  const rules = input.rulesText != null ? String(input.rulesText) : base.rulesText
+  return {
+    titleEn: (input.titleEn != null ? String(input.titleEn) : base.titleEn).trim().slice(0, 120) || base.titleEn,
+    titleAr: (input.titleAr != null ? String(input.titleAr) : base.titleAr).trim().slice(0, 120) || base.titleAr,
+    showWfpLogo: input.showWfpLogo !== false,
+    showHdpLogo: input.showHdpLogo !== false,
+    wfpLogoDataUrl: input.wfpLogoDataUrl === null ? null : input.wfpLogoDataUrl !== undefined ? asDataUrl(input.wfpLogoDataUrl) : base.wfpLogoDataUrl,
+    hdpLogoDataUrl: input.hdpLogoDataUrl === null ? null : input.hdpLogoDataUrl !== undefined ? asDataUrl(input.hdpLogoDataUrl) : base.hdpLogoDataUrl,
+    rulesText: rules.replace(/\r\n/g, '\n').trim().slice(0, 2000) || base.rulesText,
+    freeLineEn: (input.freeLineEn != null ? String(input.freeLineEn) : base.freeLineEn).trim().slice(0, 200) || base.freeLineEn,
+    freeLineAr: (input.freeLineAr != null ? String(input.freeLineAr) : base.freeLineAr).trim().slice(0, 200) || base.freeLineAr,
+    wfpHotline: (input.wfpHotline != null ? String(input.wfpHotline) : base.wfpHotline).trim().slice(0, 80),
+    hdpHotline: (input.hdpHotline != null ? String(input.hdpHotline) : base.hdpHotline).trim().slice(0, 80),
+    validFrom: (input.validFrom != null ? String(input.validFrom) : base.validFrom).trim().slice(0, 40),
+    validTo: (input.validTo != null ? String(input.validTo) : base.validTo).trim().slice(0, 40),
+    printBatch: (input.printBatch != null ? String(input.printBatch) : base.printBatch).trim().slice(0, 60),
+    showSerial: input.showSerial !== false,
+    showBatch: input.showBatch !== false,
+    serialPrefix: (input.serialPrefix != null ? String(input.serialPrefix) : base.serialPrefix).trim().slice(0, 40),
+  }
+}
+
+export async function getCardTemplate(db: Queryable): Promise<CardTemplate> {
+  try {
+    const rows = await db.query(`SELECT value_json FROM app_settings WHERE key = $1`, [CARD_TEMPLATE_KEY])
+    if (!rows[0]?.value_json) return defaultCardTemplate()
+    const parsed = JSON.parse(String(rows[0].value_json)) as Partial<CardTemplate>
+    return normalizeCardTemplate(parsed)
+  } catch {
+    return defaultCardTemplate()
+  }
+}
+
+export async function saveCardTemplate(db: Database, actor: Actor, input: Partial<CardTemplate>): Promise<CardTemplate> {
+  if (actor.role !== 'admin') throw new HttpError(403, 'forbidden')
+  const next = normalizeCardTemplate({ ...(await getCardTemplate(db)), ...input })
+  await db.query(
+    `INSERT INTO app_settings (key, value_json, updated_at, updated_by)
+     VALUES ($1, $2, now(), $3)
+     ON CONFLICT (key) DO UPDATE
+     SET value_json = EXCLUDED.value_json, updated_at = now(), updated_by = EXCLUDED.updated_by`,
+    [CARD_TEMPLATE_KEY, JSON.stringify(next), actor.id],
+  )
+  return next
+}
+
+function printBatchId(cardCode: string, issuedAt: string | null | undefined, templateBatch?: string): string {
+  const custom = templateBatch?.trim()
+  if (custom) return custom
   const day = (issuedAt ?? '').slice(0, 10).replace(/-/g, '') || '00000000'
   const tail = cardCode.replace(/[^A-Z0-9]/gi, '').slice(-4).toUpperCase() || 'XXXX'
   return `PB-${day}-${tail}`
+}
+
+function cardPrintFields(template: CardTemplate, cardCode: string | null, issuedAt: string | null | undefined, createdDay: string) {
+  const serial = cardCode ? `${template.serialPrefix}${cardCode}` : null
+  return {
+    titleEn: template.titleEn,
+    titleAr: template.titleAr,
+    showWfpLogo: template.showWfpLogo,
+    showHdpLogo: template.showHdpLogo,
+    wfpLogoDataUrl: template.wfpLogoDataUrl,
+    hdpLogoDataUrl: template.hdpLogoDataUrl,
+    rulesText: template.rulesText,
+    freeLineEn: template.freeLineEn,
+    freeLineAr: template.freeLineAr,
+    wfpHotline: template.wfpHotline || null,
+    hdpHotline: template.hdpHotline || null,
+    validFrom: template.validFrom || createdDay,
+    validTo: template.validTo || null,
+    cardSerial: template.showSerial ? serial : null,
+    printBatch: template.showBatch && cardCode ? printBatchId(cardCode, issuedAt, template.printBatch) : null,
+    showSerial: template.showSerial,
+    showBatch: template.showBatch,
+  }
 }
 
 async function dpNames(db: Queryable, dpCode: string): Promise<{ nameEn: string; nameAr: string }> {
@@ -661,7 +783,7 @@ export async function createHousehold(
       [crypto.randomUUID(), hhCode, cardCode, actor.id],
     )
     const names = await dpNames(tx, dpCode)
-    const settings = cardPrintSettings()
+    const template = await getCardTemplate(tx)
     const issuedAt = new Date().toISOString()
     return {
       hhCode,
@@ -673,12 +795,7 @@ export async function createHousehold(
       dpNameEn: names.nameEn,
       dpNameAr: names.nameAr,
       holderName: label,
-      cardSerial: cardCode,
-      printBatch: printBatchId(cardCode, issuedAt),
-      validFrom: settings.validFrom ?? adenDate(),
-      validTo: settings.validTo,
-      wfpHotline: settings.wfpHotline,
-      hdpHotline: settings.hdpHotline,
+      ...cardPrintFields(template, cardCode, issuedAt, adenDate()),
     }
   })
 }
@@ -781,7 +898,7 @@ export async function getHousehold(db: Database, actor: Actor, hhCode: string) {
   )
   const dpCode = String(rows[0].dp_code)
   const names = await dpNames(db, dpCode)
-  const settings = cardPrintSettings()
+  const template = await getCardTemplate(db)
   const activeCard = rows[0].active_card_code == null ? null : String(rows[0].active_card_code)
   const latestIssue = history.find((row) => row.action === 'issue' || row.action === 'reissue') ?? history[0]
   const issuedAt = latestIssue ? asText(latestIssue.created_at) : asText(rows[0].created_at)
@@ -797,12 +914,7 @@ export async function getHousehold(db: Database, actor: Actor, hhCode: string) {
     dpNameEn: names.nameEn,
     dpNameAr: names.nameAr,
     holderName: rows[0].label == null ? null : String(rows[0].label),
-    cardSerial: activeCard,
-    printBatch: activeCard ? printBatchId(activeCard, issuedAt) : null,
-    validFrom: settings.validFrom ?? createdDay,
-    validTo: settings.validTo,
-    wfpHotline: settings.wfpHotline,
-    hdpHotline: settings.hdpHotline,
+    ...cardPrintFields(template, activeCard, issuedAt, createdDay),
     history: history.map((row) => ({
       cardCode: String(row.card_code),
       action: String(row.action),

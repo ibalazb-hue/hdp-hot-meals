@@ -1,0 +1,230 @@
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
+import { apiJson } from '../api'
+import { explainError } from '../errors'
+import { useI18n } from '../i18n'
+import { QrCard } from './QrCard'
+import { Alert, Button, Field, Panel, TextInput } from './ui'
+
+export interface CardTemplateForm {
+  titleEn: string
+  titleAr: string
+  showWfpLogo: boolean
+  showHdpLogo: boolean
+  wfpLogoDataUrl: string | null
+  hdpLogoDataUrl: string | null
+  rulesText: string
+  freeLineEn: string
+  freeLineAr: string
+  wfpHotline: string
+  hdpHotline: string
+  validFrom: string
+  validTo: string
+  printBatch: string
+  showSerial: boolean
+  showBatch: boolean
+  serialPrefix: string
+}
+
+async function readLogo(file: File): Promise<string> {
+  if (!file.type.startsWith('image/')) throw new Error('invalid_logo')
+  if (file.size > 220_000) throw new Error('logo_too_large')
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('invalid_logo'))
+    reader.readAsDataURL(file)
+  })
+  if (dataUrl.length > 350_000) throw new Error('logo_too_large')
+  return dataUrl
+}
+
+export function CardTemplateAdmin() {
+  const { t } = useI18n()
+  const [form, setForm] = useState<CardTemplateForm | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+  const [tone, setTone] = useState<'ok' | 'danger'>('ok')
+
+  useEffect(() => {
+    void apiJson<CardTemplateForm>('/api/admin/card-template')
+      .then(setForm)
+      .catch((err) => {
+        setTone('danger')
+        setMessage(explainError(t, err))
+      })
+  }, [t])
+
+  function patch<K extends keyof CardTemplateForm>(key: K, value: CardTemplateForm[K]) {
+    setForm((current) => (current ? { ...current, [key]: value } : current))
+  }
+
+  async function onLogo(kind: 'wfp' | 'hdp', event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !form) return
+    try {
+      const dataUrl = await readLogo(file)
+      patch(kind === 'wfp' ? 'wfpLogoDataUrl' : 'hdpLogoDataUrl', dataUrl)
+      setTone('ok')
+      setMessage(t('logoReady'))
+    } catch (err) {
+      setTone('danger')
+      const code = err instanceof Error ? err.message : ''
+      setMessage(code === 'invalid_logo' || code === 'logo_too_large' ? t(code) : explainError(t, err))
+    }
+  }
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (!form) return
+    setSaving(true)
+    setMessage('')
+    try {
+      const saved = await apiJson<CardTemplateForm>('/api/admin/card-template', {
+        method: 'PUT',
+        body: JSON.stringify(form),
+      })
+      setForm(saved)
+      setTone('ok')
+      setMessage(t('cardTemplateSaved'))
+    } catch (err) {
+      setTone('danger')
+      setMessage(explainError(t, err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!form) {
+    return <Panel>{message ? <Alert tone="danger">{message}</Alert> : <p className="text-sm text-muted">{t('loading')}</p>}</Panel>
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Panel>
+        <form className="grid gap-3" onSubmit={onSubmit} data-testid="card-template-form">
+          <h2 className="text-lg font-bold">{t('cardTemplate')}</h2>
+          <p className="text-sm text-muted">{t('cardTemplateHint')}</p>
+
+          <Field label={t('cardTitleEn')}>
+            <TextInput value={form.titleEn} maxLength={120} onChange={(e) => patch('titleEn', e.target.value)} />
+          </Field>
+          <Field label={t('cardTitleAr')}>
+            <TextInput dir="rtl" value={form.titleAr} maxLength={120} onChange={(e) => patch('titleAr', e.target.value)} />
+          </Field>
+
+          <div className="grid gap-2 rounded-2xl border border-line p-3 sm:grid-cols-2">
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              <input type="checkbox" checked={form.showWfpLogo} onChange={(e) => patch('showWfpLogo', e.target.checked)} />
+              {t('showWfpLogo')}
+            </label>
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              <input type="checkbox" checked={form.showHdpLogo} onChange={(e) => patch('showHdpLogo', e.target.checked)} />
+              {t('showHdpLogo')}
+            </label>
+            <Field label={t('uploadWfpLogo')}>
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => void onLogo('wfp', e)} />
+              {form.wfpLogoDataUrl ? (
+                <button type="button" className="mt-1 text-xs font-bold text-blocked underline" onClick={() => patch('wfpLogoDataUrl', null)}>
+                  {t('clearLogo')}
+                </button>
+              ) : (
+                <p className="mt-1 text-xs text-muted">{t('defaultLogoHint')}</p>
+              )}
+            </Field>
+            <Field label={t('uploadHdpLogo')}>
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => void onLogo('hdp', e)} />
+              {form.hdpLogoDataUrl ? (
+                <button type="button" className="mt-1 text-xs font-bold text-blocked underline" onClick={() => patch('hdpLogoDataUrl', null)}>
+                  {t('clearLogo')}
+                </button>
+              ) : (
+                <p className="mt-1 text-xs text-muted">{t('defaultLogoHint')}</p>
+              )}
+            </Field>
+          </div>
+
+          <Field label={t('cardRulesText')} hint={t('cardRulesHint')}>
+            <textarea
+              className="min-h-28 w-full rounded-2xl border border-line bg-white px-3 py-2 text-sm"
+              value={form.rulesText}
+              maxLength={2000}
+              onChange={(e) => patch('rulesText', e.target.value)}
+            />
+          </Field>
+          <Field label={t('freeLineEn')}>
+            <TextInput value={form.freeLineEn} maxLength={200} onChange={(e) => patch('freeLineEn', e.target.value)} />
+          </Field>
+          <Field label={t('freeLineAr')}>
+            <TextInput dir="rtl" value={form.freeLineAr} maxLength={200} onChange={(e) => patch('freeLineAr', e.target.value)} />
+          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label={t('wfpHotline')}>
+              <TextInput dir="ltr" value={form.wfpHotline} maxLength={80} onChange={(e) => patch('wfpHotline', e.target.value)} />
+            </Field>
+            <Field label={t('hdpHotline')}>
+              <TextInput dir="ltr" value={form.hdpHotline} maxLength={80} onChange={(e) => patch('hdpHotline', e.target.value)} />
+            </Field>
+            <Field label={t('validFrom')}>
+              <TextInput dir="ltr" value={form.validFrom} maxLength={40} placeholder="YYYY-MM-DD" onChange={(e) => patch('validFrom', e.target.value)} />
+            </Field>
+            <Field label={t('validTo')}>
+              <TextInput dir="ltr" value={form.validTo} maxLength={40} placeholder="YYYY-MM-DD" onChange={(e) => patch('validTo', e.target.value)} />
+            </Field>
+          </div>
+
+          <div className="grid gap-3 rounded-2xl border border-line p-3">
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              <input type="checkbox" checked={form.showSerial} onChange={(e) => patch('showSerial', e.target.checked)} />
+              {t('showCardSerial')}
+            </label>
+            <Field label={t('serialPrefix')} hint={t('serialPrefixHint')}>
+              <TextInput dir="ltr" value={form.serialPrefix} maxLength={40} onChange={(e) => patch('serialPrefix', e.target.value)} />
+            </Field>
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              <input type="checkbox" checked={form.showBatch} onChange={(e) => patch('showBatch', e.target.checked)} />
+              {t('showPrintBatch')}
+            </label>
+            <Field label={t('printBatch')} hint={t('printBatchHint')}>
+              <TextInput dir="ltr" value={form.printBatch} maxLength={60} onChange={(e) => patch('printBatch', e.target.value)} />
+            </Field>
+          </div>
+
+          <Button type="submit" disabled={saving} data-testid="save-card-template">
+            {saving ? t('loading') : t('saveCardTemplate')}
+          </Button>
+          {message ? <Alert tone={tone === 'ok' ? 'ok' : 'danger'}>{message}</Alert> : null}
+        </form>
+      </Panel>
+
+      <div className="grid gap-3">
+        <p className="text-sm font-bold text-muted">{t('cardPreview')}</p>
+        <QrCard
+          hhCode="TZ-MDF01-000001"
+          holderName="Sample Holder"
+          dpCode="MDF01"
+          dpNameEn="Sample point"
+          dpNameAr="نقطة تجريبية"
+          beneficiaryCount={5}
+          titleEn={form.titleEn}
+          titleAr={form.titleAr}
+          showWfpLogo={form.showWfpLogo}
+          showHdpLogo={form.showHdpLogo}
+          wfpLogoDataUrl={form.wfpLogoDataUrl}
+          hdpLogoDataUrl={form.hdpLogoDataUrl}
+          rulesText={form.rulesText}
+          freeLineEn={form.freeLineEn}
+          freeLineAr={form.freeLineAr}
+          wfpHotline={form.wfpHotline}
+          hdpHotline={form.hdpHotline}
+          validFrom={form.validFrom || '2026-01-01'}
+          validTo={form.validTo || '2026-12-31'}
+          cardSerial={`${form.serialPrefix}CSAMPLE001`}
+          printBatch={form.printBatch || 'PB-20260101-0001'}
+          showSerial={form.showSerial}
+          showBatch={form.showBatch}
+        />
+      </div>
+    </div>
+  )
+}

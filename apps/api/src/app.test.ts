@@ -633,3 +633,54 @@ describe('household edit', () => {
     expect(response.status).toBe(403)
   })
 })
+
+describe('card template', () => {
+  it('lets admin save and read the entitlement card template', async () => {
+    const admin = await login('admin.taiz')
+    const meal = await login('meal.taiz')
+    const forbidden = await app.request('/api/admin/card-template', {
+      method: 'PUT',
+      headers: auth(meal.token),
+      body: JSON.stringify({ titleEn: 'Nope' }),
+    })
+    expect(forbidden.status).toBe(403)
+
+    const saved = await app.request('/api/admin/card-template', {
+      method: 'PUT',
+      headers: auth(admin.token),
+      body: JSON.stringify({
+        titleEn: 'Hot Meal Entitlement Card – Free of Charge',
+        wfpHotline: '800-WFP',
+        hdpHotline: '800-HDP',
+        validFrom: '2026-01-01',
+        validTo: '2026-12-31',
+        printBatch: 'BATCH-A1',
+        rulesText: 'Rule one\nRule two',
+        showWfpLogo: true,
+        showHdpLogo: false,
+      }),
+    })
+    expect(saved.status).toBe(200)
+    const body = (await saved.json()) as { wfpHotline: string; showHdpLogo: boolean; printBatch: string }
+    expect(body.wfpHotline).toBe('800-WFP')
+    expect(body.showHdpLogo).toBe(false)
+    expect(body.printBatch).toBe('BATCH-A1')
+
+    const read = await app.request('/api/card-template', { headers: auth(meal.token) })
+    expect(read.status).toBe(200)
+    const publicBody = (await read.json()) as { hdpHotline: string; validTo: string }
+    expect(publicBody.hdpHotline).toBe('800-HDP')
+    expect(publicBody.validTo).toBe('2026-12-31')
+
+    const created = await app.request('/api/households', {
+      method: 'POST',
+      headers: auth(meal.token),
+      body: JSON.stringify({ dpCode: 'MDF01', beneficiaryCount: 4, label: 'Card Sample' }),
+    })
+    expect(created.status).toBe(201)
+    const hh = (await created.json()) as { hhCode: string; printBatch: string; wfpHotline: string; showHdpLogo: boolean }
+    expect(hh.printBatch).toBe('BATCH-A1')
+    expect(hh.wfpHotline).toBe('800-WFP')
+    expect(hh.showHdpLogo).toBe(false)
+  })
+})

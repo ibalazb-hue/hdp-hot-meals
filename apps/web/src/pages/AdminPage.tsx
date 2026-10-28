@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { Role } from '@hdp/rules'
 import { apiJson } from '../api'
 import { useAuth } from '../auth'
+import { CardTemplateAdmin } from '../components/CardTemplateAdmin'
 import { Alert, Button, EmptyState, Field, PageHeader, Panel, RoleBadge, Segmented, SelectInput, StatusPill, TextInput } from '../components/ui'
 import { explainError } from '../errors'
 import { useI18n, type CopyKey } from '../i18n'
@@ -69,7 +70,7 @@ interface DpEdit {
   otherIds: string[]
 }
 
-type Tab = 'access' | 'points' | 'devices'
+type Tab = 'access' | 'points' | 'cards' | 'devices'
 
 const DP_CODE = /^[A-Z0-9]{2,8}$/
 const USERNAME_OK = /^[a-z0-9._-]{3,32}$/
@@ -515,6 +516,7 @@ export function AdminPage() {
         options={[
           { value: 'access', label: t('accessControl') },
           { value: 'points', label: t('points') },
+          { value: 'cards', label: t('cardTemplate') },
           { value: 'devices', label: t('devices') },
         ]}
       />
@@ -1050,6 +1052,8 @@ export function AdminPage() {
           </Panel>
         </div>
       ) : null}
+
+      {tab === 'cards' ? <CardTemplateAdmin /> : null}
 
       {tab === 'devices' ? (
         <Panel>

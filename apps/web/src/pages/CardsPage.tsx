@@ -23,6 +23,17 @@ interface Household {
   validTo?: string | null
   wfpHotline?: string | null
   hdpHotline?: string | null
+  titleEn?: string | null
+  titleAr?: string | null
+  showWfpLogo?: boolean
+  showHdpLogo?: boolean
+  wfpLogoDataUrl?: string | null
+  hdpLogoDataUrl?: string | null
+  rulesText?: string | null
+  freeLineEn?: string | null
+  freeLineAr?: string | null
+  showSerial?: boolean
+  showBatch?: boolean
 }
 
 interface DpOption {
@@ -221,6 +232,17 @@ export function CardsPage() {
               wfpHotline={selected.wfpHotline}
               hdpHotline={selected.hdpHotline}
               beneficiaryCount={selected.beneficiaryCount}
+              titleEn={selected.titleEn}
+              titleAr={selected.titleAr}
+              showWfpLogo={selected.showWfpLogo}
+              showHdpLogo={selected.showHdpLogo}
+              wfpLogoDataUrl={selected.wfpLogoDataUrl}
+              hdpLogoDataUrl={selected.hdpLogoDataUrl}
+              rulesText={selected.rulesText}
+              freeLineEn={selected.freeLineEn}
+              freeLineAr={selected.freeLineAr}
+              showSerial={selected.showSerial}
+              showBatch={selected.showBatch}
             />
           ) : null}
         </Panel>

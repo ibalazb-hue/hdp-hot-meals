@@ -22,6 +22,17 @@ interface Issued {
   validTo?: string | null
   wfpHotline?: string | null
   hdpHotline?: string | null
+  titleEn?: string | null
+  titleAr?: string | null
+  showWfpLogo?: boolean
+  showHdpLogo?: boolean
+  wfpLogoDataUrl?: string | null
+  hdpLogoDataUrl?: string | null
+  rulesText?: string | null
+  freeLineEn?: string | null
+  freeLineAr?: string | null
+  showSerial?: boolean
+  showBatch?: boolean
 }
 
 export function RegisterPage() {
@@ -102,6 +113,17 @@ export function RegisterPage() {
               wfpHotline={issued.wfpHotline}
               hdpHotline={issued.hdpHotline}
               beneficiaryCount={issued.beneficiaryCount}
+              titleEn={issued.titleEn}
+              titleAr={issued.titleAr}
+              showWfpLogo={issued.showWfpLogo}
+              showHdpLogo={issued.showHdpLogo}
+              wfpLogoDataUrl={issued.wfpLogoDataUrl}
+              hdpLogoDataUrl={issued.hdpLogoDataUrl}
+              rulesText={issued.rulesText}
+              freeLineEn={issued.freeLineEn}
+              freeLineAr={issued.freeLineAr}
+              showSerial={issued.showSerial}
+              showBatch={issued.showBatch}
             />
           </div>
         </div>

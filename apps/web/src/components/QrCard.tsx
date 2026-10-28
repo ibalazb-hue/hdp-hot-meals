@@ -6,7 +6,6 @@ import { Button } from './ui'
 
 export interface EntitlementCardProps {
   hhCode: string
-  /** Printed QR encodes household code only (scan still accepts legacy HDP1 payloads). */
   holderName?: string | null
   dpCode: string
   dpNameEn?: string | null
@@ -18,15 +17,26 @@ export interface EntitlementCardProps {
   wfpHotline?: string | null
   hdpHotline?: string | null
   beneficiaryCount?: number | null
+  titleEn?: string | null
+  titleAr?: string | null
+  showWfpLogo?: boolean
+  showHdpLogo?: boolean
+  wfpLogoDataUrl?: string | null
+  hdpLogoDataUrl?: string | null
+  rulesText?: string | null
+  freeLineEn?: string | null
+  freeLineAr?: string | null
+  showSerial?: boolean
+  showBatch?: boolean
 }
 
 function formatValidity(from?: string | null, to?: string | null): string {
-  const start = from?.trim() || '[start — set CARD_VALID_FROM]'
-  const end = to?.trim() || '[end — set CARD_VALID_TO]'
+  const start = from?.trim() || '—'
+  const end = to?.trim() || '—'
   return `${start} – ${end}`
 }
 
-/** Single-sided printable Hot Meal Entitlement Card (front only). */
+/** Single-sided printable Hot Meal Entitlement Card (front only). Content comes from Admin card template. */
 export function QrCard(props: EntitlementCardProps) {
   const { t } = useI18n()
   const [qrUrl, setQrUrl] = useState('')
@@ -41,29 +51,43 @@ export function QrCard(props: EntitlementCardProps) {
     }).then(setQrUrl)
   }, [qrPayload])
 
+  const titleEn = props.titleEn?.trim() || 'Hot Meal Entitlement Card – Free of Charge'
+  const titleAr = props.titleAr?.trim() || 'بطاقة استحقاق وجبة ساخنة – مجاناً'
+  const freeEn = props.freeLineEn?.trim() || t('cardAssistanceFree')
+  const freeAr = props.freeLineAr?.trim() || 'المساعدة مجانية — لا تدفع لأي شخص'
+  const rules = (props.rulesText?.trim() || `${t('cardRuleOneMeal')}\n${t('cardRulePersonal')}\n${t('cardRuleLoss')}`)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
   const dpLabel = [props.dpCode, props.dpNameEn || props.dpNameAr].filter(Boolean).join(' — ')
   const holder = props.holderName?.trim() || '—'
+  const showSerial = props.showSerial !== false
+  const showBatch = props.showBatch !== false
   const serial = props.cardSerial?.trim() || '—'
   const batch = props.printBatch?.trim() || '—'
   const validity = formatValidity(props.validFrom, props.validTo)
-  const wfp = props.wfpHotline?.trim() || '[WFP Hotline — set WFP_HOTLINE]'
-  const hdp = props.hdpHotline?.trim() || '[HDP Hotline — set HDP_HOTLINE]'
+  const wfp = props.wfpHotline?.trim() || '—'
+  const hdp = props.hdpHotline?.trim() || '—'
 
   return (
     <div className="entitlement-print mx-auto w-full max-w-md text-ink">
       <article className="entitlement-face entitlement-front rounded-2xl border-2 border-ink bg-white p-4 shadow-sm sm:p-5">
         <div className="flex items-start justify-between gap-3 border-b border-line pb-3">
-          <BrandLogos className="h-14 sm:h-16" />
+          <BrandLogos
+            className="h-14 sm:h-16"
+            showWfp={props.showWfpLogo !== false}
+            showHdp={props.showHdpLogo !== false}
+            wfpSrc={props.wfpLogoDataUrl}
+            hdpSrc={props.hdpLogoDataUrl}
+          />
           <p className="max-w-[9rem] text-end text-[10px] font-semibold uppercase tracking-wide text-muted">
             As authorised
           </p>
         </div>
 
-        <h2 className="mt-3 text-center text-base font-extrabold leading-snug sm:text-lg">
-          Hot Meal Entitlement Card – Free of Charge
-        </h2>
+        <h2 className="mt-3 text-center text-base font-extrabold leading-snug sm:text-lg">{titleEn}</h2>
         <p className="mt-1 text-center text-xs font-semibold text-muted" dir="rtl">
-          بطاقة استحقاق وجبة ساخنة – مجاناً
+          {titleAr}
         </p>
 
         <div className="mt-3 flex flex-col items-center gap-2 sm:mt-4 sm:gap-3">
@@ -118,17 +142,15 @@ export function QrCard(props: EntitlementCardProps) {
           ) : null}
         </dl>
 
-        <p className="mt-3 rounded-xl bg-mist px-3 py-2.5 text-center text-sm font-extrabold text-teal">
-          {t('cardAssistanceFree')}
-        </p>
+        <p className="mt-3 rounded-xl bg-mist px-3 py-2.5 text-center text-sm font-extrabold text-teal">{freeEn}</p>
         <p className="mt-1 text-center text-xs font-semibold text-muted" dir="rtl">
-          المساعدة مجانية — لا تدفع لأي شخص
+          {freeAr}
         </p>
 
         <ul className="mt-3 list-disc space-y-1 ps-5 text-xs leading-relaxed sm:text-sm">
-          <li>{t('cardRuleOneMeal')}</li>
-          <li>{t('cardRulePersonal')}</li>
-          <li>{t('cardRuleLoss')}</li>
+          {rules.map((rule) => (
+            <li key={rule}>{rule}</li>
+          ))}
         </ul>
 
         <dl className="mt-3 grid gap-1.5 border-t border-line pt-3 text-sm">
@@ -144,23 +166,25 @@ export function QrCard(props: EntitlementCardProps) {
               {hdp}
             </dd>
           </div>
-          <div className="flex justify-between gap-3 py-0.5">
-            <dt className="text-muted">{t('cardSerial')}</dt>
-            <dd className="font-mono text-end text-xs font-bold" dir="ltr">
-              {serial}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-3 py-0.5">
-            <dt className="text-muted">{t('printBatch')}</dt>
-            <dd className="font-mono text-end text-xs font-bold" dir="ltr">
-              {batch}
-            </dd>
-          </div>
+          {showSerial ? (
+            <div className="flex justify-between gap-3 py-0.5">
+              <dt className="text-muted">{t('cardSerial')}</dt>
+              <dd className="font-mono text-end text-xs font-bold" dir="ltr">
+                {serial}
+              </dd>
+            </div>
+          ) : null}
+          {showBatch ? (
+            <div className="flex justify-between gap-3 py-0.5">
+              <dt className="text-muted">{t('printBatch')}</dt>
+              <dd className="font-mono text-end text-xs font-bold" dir="ltr">
+                {batch}
+              </dd>
+            </div>
+          ) : null}
         </dl>
 
-        <p className="mt-3 text-center text-[10px] text-muted">
-          Humanitarian Community Kitchen – Hot Cooked Meals
-        </p>
+        <p className="mt-3 text-center text-[10px] text-muted">Humanitarian Community Kitchen – Hot Cooked Meals</p>
       </article>
 
       <Button className="no-print mt-4 w-full" data-testid="print-card" onClick={() => window.print()}>

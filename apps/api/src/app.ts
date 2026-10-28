@@ -15,6 +15,7 @@ import {
   createUser,
   dashboard,
   exportRegister,
+  getCardTemplate,
   getHousehold,
   getScan,
   HttpError,
@@ -29,6 +30,7 @@ import {
   updateUser,
   reconciliation,
   reissueCard,
+  saveCardTemplate,
   syncBundle,
   upsertProduction,
   voidCard,
@@ -206,7 +208,10 @@ export function createApp(db: Database, options?: { distDir?: string }) {
     })
   })
 
+  app.get('/api/card-template', async (c) => c.json(await getCardTemplate(db)))
+
   app.use('/api/admin/*', async (c, next) => {
+
     if (c.get('actor').role !== 'admin') throw new HttpError(403, 'forbidden')
     await next()
   })
@@ -280,6 +285,32 @@ export function createApp(db: Database, options?: { distDir?: string }) {
     return c.json(await deleteUser(db, c.get('actor').id, c.req.param('id')))
   })
   app.get('/api/admin/devices', async (c) => c.json(await listDevices(db)))
+  app.get('/api/admin/card-template', async (c) => c.json(await getCardTemplate(db)))
+  app.put('/api/admin/card-template', async (c) => {
+    const body = parse(
+      z.object({
+        titleEn: z.string().max(120).optional(),
+        titleAr: z.string().max(120).optional(),
+        showWfpLogo: z.boolean().optional(),
+        showHdpLogo: z.boolean().optional(),
+        wfpLogoDataUrl: z.string().max(400_000).nullish(),
+        hdpLogoDataUrl: z.string().max(400_000).nullish(),
+        rulesText: z.string().max(2000).optional(),
+        freeLineEn: z.string().max(200).optional(),
+        freeLineAr: z.string().max(200).optional(),
+        wfpHotline: z.string().max(80).optional(),
+        hdpHotline: z.string().max(80).optional(),
+        validFrom: z.string().max(40).optional(),
+        validTo: z.string().max(40).optional(),
+        printBatch: z.string().max(60).optional(),
+        showSerial: z.boolean().optional(),
+        showBatch: z.boolean().optional(),
+        serialPrefix: z.string().max(40).optional(),
+      }),
+      await c.req.json(),
+    )
+    return c.json(await saveCardTemplate(db, c.get('actor'), body))
+  })
 
   app.all('/api/*', () => {
     throw new HttpError(404, 'not_found')
