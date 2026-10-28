@@ -991,21 +991,37 @@ export async function upsertProduction(
   actor: Actor,
   input: { dpCode: string; productionDate: string; mealsPrepared: number; notes?: string | null },
 ) {
-  if (actor.role !== 'supervisor' && actor.role !== 'meal' && actor.role !== 'admin') {
-    throw new HttpError(403, 'forbidden')
-  }
+  // Only MEAL may enter or adjust meals prepared. Admin/supervisor view via reconciliation.
+  if (actor.role !== 'meal') throw new HttpError(403, 'forbidden')
   const dpCode = input.dpCode.toUpperCase()
   assertDpAccess(actor, dpCode)
   await assertActiveDp(db, dpCode)
+  const notes = cleanLabel(input.notes)
+  const previousRows = await db.query(
+    `SELECT meals_prepared FROM daily_production WHERE dp_code = $1 AND production_date = $2`,
+    [dpCode, input.productionDate],
+  )
+  const previous = previousRows[0] ? Number(previousRows[0].meals_prepared) : null
   await db.query(
     `INSERT INTO daily_production (dp_code, production_date, meals_prepared, recorded_by, notes)
      VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (dp_code, production_date) DO UPDATE
      SET meals_prepared = EXCLUDED.meals_prepared, recorded_by = EXCLUDED.recorded_by,
          notes = EXCLUDED.notes, updated_at = now()`,
-    [dpCode, input.productionDate, input.mealsPrepared, actor.id, cleanLabel(input.notes)],
+    [dpCode, input.productionDate, input.mealsPrepared, actor.id, notes],
   )
-  return { dpCode, productionDate: input.productionDate, mealsPrepared: input.mealsPrepared }
+  await db.query(
+    `INSERT INTO daily_production_history
+      (id, dp_code, production_date, meals_prepared, previous_meals_prepared, recorded_by, notes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [crypto.randomUUID(), dpCode, input.productionDate, input.mealsPrepared, previous, actor.id, notes],
+  )
+  return {
+    dpCode,
+    productionDate: input.productionDate,
+    mealsPrepared: input.mealsPrepared,
+    previousMealsPrepared: previous,
+  }
 }
 
 export async function reconciliation(db: Database, actor: Actor, scanDate: string) {
@@ -1022,6 +1038,15 @@ export async function reconciliation(db: Database, actor: Actor, scanDate: strin
       [dpCode, scanDate],
     )
     const names = await db.query(`SELECT name_en, name_ar FROM distribution_points WHERE code = $1`, [dpCode])
+    const historyRows = await db.query(
+      `SELECT h.meals_prepared, h.previous_meals_prepared, h.notes, h.created_at, u.display_name
+       FROM daily_production_history h
+       JOIN users u ON u.id = h.recorded_by
+       WHERE h.dp_code = $1 AND h.production_date = $2
+       ORDER BY h.created_at DESC
+       LIMIT 20`,
+      [dpCode, scanDate],
+    )
     const prepared = production[0] ? Number(production[0].meals_prepared) : null
     const uniqueServed = Number(served[0]?.n ?? 0)
     const variance = reconciliationVariance(prepared, uniqueServed)
@@ -1031,6 +1056,14 @@ export async function reconciliation(db: Database, actor: Actor, scanDate: strin
       nameAr: names[0] ? String(names[0].name_ar) : dpCode,
       mealsPrepared: prepared,
       uniqueServed,
+      canEditPrepared: actor.role === 'meal',
+      history: historyRows.map((row) => ({
+        at: String(row.created_at),
+        mealsPrepared: Number(row.meals_prepared),
+        previousMealsPrepared: row.previous_meals_prepared == null ? null : Number(row.previous_meals_prepared),
+        recordedBy: String(row.display_name || ''),
+        notes: row.notes == null ? null : String(row.notes),
+      })),
       ...variance,
     })
   }
@@ -1424,6 +1457,7 @@ export async function deleteUser(db: Database, actorId: string, id: string) {
      UNION ALL SELECT 1 FROM card_issuance WHERE operator_id = $1
      UNION ALL SELECT 1 FROM households WHERE registered_by = $1
      UNION ALL SELECT 1 FROM daily_production WHERE recorded_by = $1
+     UNION ALL SELECT 1 FROM daily_production_history WHERE recorded_by = $1
      UNION ALL SELECT 1 FROM spot_checks WHERE supervisor_id = $1
      LIMIT 1`,
     [id],

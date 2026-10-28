@@ -235,6 +235,60 @@ describe('meal scans', () => {
   })
 })
 
+describe('meals prepared access', () => {
+  it('lets only MEAL enter or adjust meals prepared and keeps history', async () => {
+    const meal = await login('meal.taiz')
+    const admin = await login('admin.taiz')
+    const supervisor = await login('supervisor.taiz')
+    const date = adenDate()
+
+    for (const actor of [admin, supervisor]) {
+      const refused = await app.request('/api/production', {
+        method: 'POST',
+        headers: auth(actor.token),
+        body: JSON.stringify({ dpCode: 'MDF01', productionDate: date, mealsPrepared: 50 }),
+      })
+      expect(refused.status).toBe(403)
+    }
+
+    const first = await app.request('/api/production', {
+      method: 'POST',
+      headers: auth(meal.token),
+      body: JSON.stringify({ dpCode: 'MDF01', productionDate: date, mealsPrepared: 40 }),
+    })
+    expect(first.status).toBe(200)
+    expect(await first.json()).toMatchObject({ mealsPrepared: 40, previousMealsPrepared: null })
+
+    const second = await app.request('/api/production', {
+      method: 'POST',
+      headers: auth(meal.token),
+      body: JSON.stringify({ dpCode: 'MDF01', productionDate: date, mealsPrepared: 55 }),
+    })
+    expect(second.status).toBe(200)
+    expect(await second.json()).toMatchObject({ mealsPrepared: 55, previousMealsPrepared: 40 })
+
+    const recon = await app.request(`/api/reconciliation?date=${date}`, { headers: auth(admin.token) })
+    expect(recon.status).toBe(200)
+    const body = (await recon.json()) as {
+      rows: Array<{
+        dpCode: string
+        mealsPrepared: number | null
+        canEditPrepared: boolean
+        history: Array<{ mealsPrepared: number; previousMealsPrepared: number | null }>
+      }>
+    }
+    const row = body.rows.find((item) => item.dpCode === 'MDF01')
+    expect(row?.mealsPrepared).toBe(55)
+    expect(row?.canEditPrepared).toBe(false)
+    expect(row?.history[0]).toMatchObject({ mealsPrepared: 55, previousMealsPrepared: 40 })
+    expect(row?.history[1]).toMatchObject({ mealsPrepared: 40, previousMealsPrepared: null })
+
+    const mealRecon = await app.request(`/api/reconciliation?date=${date}`, { headers: auth(meal.token) })
+    const mealBody = (await mealRecon.json()) as { rows: Array<{ dpCode: string; canEditPrepared: boolean }> }
+    expect(mealBody.rows.find((item) => item.dpCode === 'MDF01')?.canEditPrepared).toBe(true)
+  })
+})
+
 describe('admin users', () => {
   it('lets an admin edit a user and delete one who has no audit record', async () => {
     const admin = await login('admin.taiz')

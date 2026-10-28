@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { adenDate } from '@hdp/rules'
 import { apiJson } from '../api'
+import { useAuth } from '../auth'
 import { Alert, Button, EmptyState, Field, PageHeader, Panel, ProgressBar, StatCard, TextInput } from '../components/ui'
 import { explainError } from '../errors'
 import { useI18n } from '../i18n'
+
+interface HistoryEntry {
+  at: string
+  mealsPrepared: number
+  previousMealsPrepared: number | null
+  recordedBy: string
+  notes: string | null
+}
 
 interface Row {
   dpCode: string
@@ -14,10 +23,29 @@ interface Row {
   variance: number | null
   alert: boolean
   reason: string | null
+  canEditPrepared?: boolean
+  history?: HistoryEntry[]
+}
+
+function formatHistoryTime(value: string, locale: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  try {
+    return new Intl.DateTimeFormat(locale === 'ar' ? 'ar' : 'en', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'Asia/Aden',
+    }).format(date)
+  } catch {
+    return date.toLocaleString()
+  }
 }
 
 export function ReconcilePage() {
   const { t, locale } = useI18n()
+  const { session } = useAuth()
+  const role = session?.user.role
+  const canEditPrepared = role === 'meal'
   const [date, setDate] = useState(adenDate())
   const [rows, setRows] = useState<Row[]>([])
   const [prepared, setPrepared] = useState<Record<string, string>>({})
@@ -50,6 +78,7 @@ export function ReconcilePage() {
   }, [rows])
 
   async function saveProduction(row: Row) {
+    if (!canEditPrepared) return
     setSaving(row.dpCode)
     setMessage('')
     try {
@@ -74,12 +103,16 @@ export function ReconcilePage() {
 
   return (
     <div className="grid gap-4">
-      <PageHeader title={t('reconcile')} subtitle={t('reconcileSubtitle')} />
+      <PageHeader
+        title={t('reconcile')}
+        subtitle={canEditPrepared ? t('reconcileSubtitle') : t('reconcileViewOnlySubtitle')}
+      />
 
       <Field label={t('day')}>
         <TextInput type="date" value={date} onChange={(event) => setDate(event.target.value)} />
       </Field>
 
+      {!canEditPrepared ? <Alert tone="warn">{t('mealsPreparedMealOnly')}</Alert> : null}
       {message ? <Alert tone={tone === 'ok' ? 'ok' : tone === 'warn' ? 'warn' : 'danger'}>{message}</Alert> : null}
       {totals.alerts > 0 ? <Alert tone="danger">{t('alert')}</Alert> : null}
       {totals.missing > 0 && totals.alerts === 0 ? <Alert tone="warn">{t('missing')}</Alert> : null}
@@ -97,6 +130,7 @@ export function ReconcilePage() {
         {rows.map((row) => {
           const name = locale === 'ar' ? row.nameAr : row.nameEn
           const ratio = row.mealsPrepared && row.mealsPrepared > 0 ? row.uniqueServed / row.mealsPrepared : null
+          const history = row.history ?? []
           return (
             <Panel key={row.dpCode} className="grid gap-3">
               <div className="flex items-start justify-between gap-2">
@@ -130,50 +164,82 @@ export function ReconcilePage() {
 
               <ProgressBar ratio={ratio} alert={row.alert} />
 
-              <Field label={t('mealsPrepared')} hint={t('enterMealsHint')}>
-                <TextInput
-                  inputMode="numeric"
-                  value={prepared[row.dpCode] ?? ''}
-                  onChange={(event) => setPrepared((current) => ({ ...current, [row.dpCode]: event.target.value.replace(/[^\d]/g, '') }))}
-                />
-              </Field>
+              {canEditPrepared ? (
+                <>
+                  <Field label={t('mealsPrepared')} hint={t('enterMealsHint')}>
+                    <TextInput
+                      inputMode="numeric"
+                      value={prepared[row.dpCode] ?? ''}
+                      onChange={(event) => setPrepared((current) => ({ ...current, [row.dpCode]: event.target.value.replace(/[^\d]/g, '') }))}
+                    />
+                  </Field>
+                  <Button type="button" disabled={saving === row.dpCode} onClick={() => void saveProduction(row)}>
+                    {saving === row.dpCode ? t('saving') : t('saveMealsPrepared')}
+                  </Button>
+                </>
+              ) : (
+                <div className="rounded-2xl border border-line bg-white px-3 py-2">
+                  <p className="text-xs font-semibold text-muted">{t('mealsPrepared')}</p>
+                  <p className="tabular text-2xl font-bold">{row.mealsPrepared ?? '—'}</p>
+                </div>
+              )}
 
-              <Button type="button" disabled={saving === row.dpCode} onClick={() => void saveProduction(row)}>
-                {saving === row.dpCode ? t('saving') : t('saveMealsPrepared')}
-              </Button>
+              <div className="rounded-2xl border border-line/80 bg-mist/40 p-3">
+                <h3 className="text-sm font-bold">{t('preparedHistory')}</h3>
+                {history.length === 0 ? (
+                  <p className="mt-1 text-xs text-muted">{t('preparedHistoryEmpty')}</p>
+                ) : (
+                  <ul className="mt-2 grid gap-2">
+                    {history.map((entry) => (
+                      <li key={`${entry.at}-${entry.mealsPrepared}`} className="text-xs leading-relaxed">
+                        <p className="font-semibold text-ink">
+                          {entry.previousMealsPrepared == null
+                            ? `${t('preparedHistorySet')} ${entry.mealsPrepared}`
+                            : `${t('preparedHistoryChanged')} ${entry.previousMealsPrepared} → ${entry.mealsPrepared}`}
+                        </p>
+                        <p className="text-muted">
+                          {entry.recordedBy || '—'} · {formatHistoryTime(entry.at, locale)}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </Panel>
           )
         })}
       </div>
 
-      <Panel className="grid gap-3">
-        <h2 className="font-bold">{t('finding')}</h2>
-        <p className="text-sm text-muted">{t('spotHint')}</p>
-        <Field label={t('dp')}>
-          <TextInput value={dp} onChange={(event) => setDp(event.target.value.toUpperCase())} dir="ltr" placeholder="MDF01" />
-        </Field>
-        <Field label={t('finding')}>
-          <TextInput value={finding} onChange={(event) => setFinding(event.target.value)} placeholder={t('findingPlaceholder')} />
-        </Field>
-        <Button
-          type="button"
-          tone="sand"
-          onClick={() => {
-            void apiJson('/api/spot-checks', { method: 'POST', body: JSON.stringify({ dpCode: dp, finding }) })
-              .then(() => {
-                setTone('ok')
-                setMessage(t('spotSaved'))
-                setFinding('')
-              })
-              .catch((error) => {
-                setTone('danger')
-                setMessage(explainError(t, error))
-              })
-          }}
-        >
-          {t('save')}
-        </Button>
-      </Panel>
+      {role === 'supervisor' || role === 'admin' ? (
+        <Panel className="grid gap-3">
+          <h2 className="font-bold">{t('finding')}</h2>
+          <p className="text-sm text-muted">{t('spotHint')}</p>
+          <Field label={t('dp')}>
+            <TextInput value={dp} onChange={(event) => setDp(event.target.value.toUpperCase())} dir="ltr" placeholder="MDF01" />
+          </Field>
+          <Field label={t('finding')}>
+            <TextInput value={finding} onChange={(event) => setFinding(event.target.value)} placeholder={t('findingPlaceholder')} />
+          </Field>
+          <Button
+            type="button"
+            tone="sand"
+            onClick={() => {
+              void apiJson('/api/spot-checks', { method: 'POST', body: JSON.stringify({ dpCode: dp, finding }) })
+                .then(() => {
+                  setTone('ok')
+                  setMessage(t('spotSaved'))
+                  setFinding('')
+                })
+                .catch((error) => {
+                  setTone('danger')
+                  setMessage(explainError(t, error))
+                })
+            }}
+          >
+            {t('save')}
+          </Button>
+        </Panel>
+      ) : null}
     </div>
   )
 }
