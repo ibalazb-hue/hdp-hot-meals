@@ -14,9 +14,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: false,
       manifest: {
-        name: 'Humanitarian Community Kitchen – Hot Cooked Meals',
-        short_name: 'Hot Cooked Meals',
-        description: 'Humanitarian Community Kitchen – Hot Cooked Meals. One hot meal per household per day for Al-Mudhaffar and Al-Qahira.',
+        name: 'Humanitarian Community Kitchen',
+        short_name: 'Community Kitchen',
+        description: 'Humanitarian Community Kitchen. One meal per household per day for Al-Mudhaffar and Al-Qahira.',
         start_url: '/',
         scope: '/',
         display: 'standalone',

@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 export const en = {
-  appName: 'Humanitarian Community Kitchen – Hot Cooked Meals',
+  appName: 'Humanitarian Community Kitchen',
   appPlace: 'Taiz · Al-Mudhaffar & Al-Qahira',
   login: 'Sign in',
   username: 'Username',
@@ -164,7 +164,7 @@ export const en = {
   displayName: 'Name',
   newPassword: 'Password',
   assigned: 'Assigned points',
-  oneMeal: 'One hot meal per household per day.',
+  oneMeal: 'One meal per household per day.',
   doNotServe: 'Do not serve.',
   serveOne: 'Serve one meal.',
   overrideTitle: 'Supervisor override',
@@ -248,7 +248,7 @@ export const en = {
   noLocation: 'Location not recorded',
   sampleCards: 'Training cards',
   passwordShared: 'Shared training password',
-  loginTagline: 'MEAL control for hot-meal distribution.',
+  loginTagline: 'MEAL control for meal distribution.',
   dashboardSubtitle: 'Prepared vs served, variance, and block reasons — for the selected day.',
   adminSubtitle: 'Access control, full distribution-point management, and field devices.',
   reconcileSubtitle: 'Enter meals prepared per point and review the 1% variance rule.',
@@ -343,7 +343,7 @@ export const en = {
 }
 
 const ar: Record<keyof typeof en, string> = {
-  appName: 'المطبخ المجتمعي الإنساني – وجبات مطبوخة ساخنة',
+  appName: 'مشروع المطبخ المجتمعي',
   appPlace: 'تعز · المظفر والقاهرة',
   login: 'دخول',
   username: 'اسم المستخدم',
@@ -506,7 +506,7 @@ const ar: Record<keyof typeof en, string> = {
   displayName: 'الاسم',
   newPassword: 'كلمة المرور',
   assigned: 'النقاط المخصصة',
-  oneMeal: 'وجبة ساخنة واحدة لكل أسرة في اليوم.',
+  oneMeal: 'وجبة واحدة لكل أسرة في اليوم.',
   doNotServe: 'لا تصرف.',
   serveOne: 'اصرف وجبة واحدة.',
   overrideTitle: 'تجاوز المشرف',
@@ -590,7 +590,7 @@ const ar: Record<keyof typeof en, string> = {
   noLocation: 'لم يُسجَّل الموقع',
   sampleCards: 'بطاقات التدريب',
   passwordShared: 'كلمة مرور التدريب',
-  loginTagline: 'متابعة وإدارة صرف الوجبات الساخنة.',
+  loginTagline: 'متابعة وإدارة صرف الوجبات.',
   dashboardSubtitle: 'المُعدّ مقابل المصروف، والفرق، وأسباب الرفض — لليوم المحدد.',
   adminSubtitle: 'التحكم في الوصول وإدارة نقاط التوزيع بالكامل وأجهزة الميدان.',
   reconcileSubtitle: 'أدخل الوجبات المُعدّة لكل نقطة وراجع قاعدة الفرق 1٪.',

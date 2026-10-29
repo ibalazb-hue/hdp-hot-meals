@@ -86,7 +86,7 @@ export function QrCard(props: EntitlementCardProps) {
     }).then(setQrUrl)
   }, [qrPayload])
 
-  const titleAr = props.titleAr?.trim() || 'بطاقة استحقاق وجبة ساخنة - مجاناً'
+  const titleAr = props.titleAr?.trim() || 'بطاقة استحقاق - مجاناً'
   const projectTitle = props.projectTitleAr?.trim() || 'مشروع المطبخ المجتمعي'
   const holder = props.holderName?.trim() || '—'
   const count =
