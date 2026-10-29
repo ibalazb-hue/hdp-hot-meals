@@ -90,7 +90,7 @@ textarea {
   font-variant-numeric: tabular-nums;
 }
 
-/* Arabic entitlement card — credit-card landscape (~85.6 × 54 mm) */
+/* Arabic entitlement card — screen preview ~credit-card; print ≈ 190×90 mm (1/3 A4) */
 .entitlement-card-mm {
   --card-teal: #0b5c6b;
   position: relative;
@@ -349,7 +349,7 @@ textarea {
   flex-direction: column;
   align-items: center;
   justify-content: space-evenly;
-  gap: 6mm;
+  gap: 5mm;
   padding: 4mm 0;
 }
 
@@ -397,40 +397,154 @@ textarea {
   .bulk-print-sheet {
     display: block !important;
   }
+  /* Usable A4 ≈ 194×281 mm with 8 mm margins; 3 faces × 90 mm + small gaps */
   .a4-page {
     width: 100%;
-    min-height: 277mm;
-    height: 277mm;
+    min-height: 281mm;
+    height: 281mm;
     box-sizing: border-box;
     page-break-after: always;
     break-after: page;
     justify-content: space-evenly;
-    gap: 8mm;
+    gap: 5mm;
     padding: 0;
   }
   .a4-page:last-child {
     page-break-after: auto;
     break-after: auto;
   }
+  /* Each printed face ≈ one third of A4 (wide landscape strip) */
   .entitlement-face {
     break-inside: avoid;
     page-break-inside: avoid;
     page-break-after: avoid !important;
     box-shadow: none !important;
     border-radius: 0 !important;
-    width: 85.6mm !important;
-    max-width: 85.6mm !important;
-    height: 54mm !important;
+    width: 190mm !important;
+    max-width: 190mm !important;
+    height: 90mm !important;
     aspect-ratio: auto;
     margin: 0 auto !important;
     padding: 0 !important;
   }
-  /* Single-card print: one face per A4 page */
-  .entitlement-print:not(.bulk-card) .entitlement-front {
-    page-break-after: always;
+  /* Scale card chrome for the larger print face */
+  .entitlement-face .card-teal-band {
+    height: 5mm !important;
   }
+  .entitlement-face .card-front-body,
+  .entitlement-face .card-back-body {
+    padding: 8mm 7mm 5.5mm !important;
+  }
+  .entitlement-face .card-logo-row {
+    margin-bottom: 3.5mm !important;
+  }
+  .entitlement-face .card-logo-row img,
+  .entitlement-face .card-logo-row > span > img,
+  .entitlement-face .card-logo-row > span > span {
+    height: 14mm !important;
+    max-height: 14mm !important;
+  }
+  .entitlement-face .card-front-columns {
+    gap: 6mm !important;
+  }
+  .entitlement-face .card-main-title {
+    font-size: 18px !important;
+  }
+  .entitlement-face .card-project-title {
+    margin: 1.5mm 0 3.5mm !important;
+    font-size: 14px !important;
+  }
+  .entitlement-face .card-fields {
+    gap: 3.5mm !important;
+  }
+  .entitlement-face .card-field-row {
+    gap: 3mm !important;
+    min-height: 8mm !important;
+    padding-bottom: 1.2mm !important;
+  }
+  .entitlement-face .card-field-label {
+    font-size: 13px !important;
+  }
+  .entitlement-face .card-field-value {
+    font-size: 16px !important;
+  }
+  .entitlement-face .card-dates {
+    margin-top: 3mm !important;
+    font-size: 13px !important;
+  }
+  .entitlement-face .card-qr-img,
+  .entitlement-face .card-qr-placeholder {
+    width: 48mm !important;
+    height: 48mm !important;
+  }
+  .entitlement-face .card-hh-code {
+    margin-top: 2.5mm !important;
+    font-size: 14px !important;
+  }
+  .entitlement-face .card-back-header {
+    margin-bottom: 3.5mm !important;
+  }
+  .entitlement-face .card-back-title {
+    font-size: 16px !important;
+    padding: 2.5mm 3.5mm !important;
+    border-radius: 1.5mm !important;
+  }
+  .entitlement-face .card-hotline-label {
+    margin-top: 2.5mm !important;
+    font-size: 14px !important;
+  }
+  .entitlement-face .card-hotline-grid {
+    gap: 4mm !important;
+    margin-bottom: 3.5mm !important;
+  }
+  .entitlement-face .card-hotline-panel {
+    border-radius: 2mm !important;
+    padding: 3mm 3.5mm !important;
+    min-height: 28mm !important;
+  }
+  .entitlement-face .card-hotline-panel-title {
+    font-size: 12px !important;
+    margin-bottom: 2mm !important;
+    min-height: 4mm !important;
+    padding-bottom: 1.2mm !important;
+  }
+  .entitlement-face .card-hotline-row {
+    gap: 2.5mm !important;
+    font-size: 13px !important;
+    margin-top: 2mm !important;
+  }
+  .entitlement-face .card-icon {
+    width: 5.5mm !important;
+    height: 5.5mm !important;
+  }
+  .entitlement-face .card-reassurance {
+    margin-bottom: 2mm !important;
+    font-size: 12px !important;
+    line-height: 1.45 !important;
+  }
+  .entitlement-face .card-personal-notice {
+    font-size: 11px !important;
+    line-height: 1.4 !important;
+  }
+  .entitlement-face .card-meta {
+    gap: 8mm !important;
+    margin-top: 2.5mm !important;
+    font-size: 10px !important;
+  }
+  /* Single-card print: front + back on one A4, each ~1/3 page */
+  .entitlement-print:not(.bulk-card) {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: space-evenly !important;
+    gap: 8mm !important;
+    min-height: 281mm !important;
+    height: 281mm !important;
+    box-sizing: border-box !important;
+  }
+  .entitlement-print:not(.bulk-card) .entitlement-front,
   .entitlement-print:not(.bulk-card) .entitlement-back {
-    page-break-after: auto;
+    page-break-after: avoid !important;
   }
   .a4-page .entitlement-front,
   .a4-page .entitlement-back {

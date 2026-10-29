@@ -110,7 +110,7 @@ export function QrCard(props: EntitlementCardProps) {
 
   useEffect(() => {
     void QRCode.toDataURL(qrPayload, {
-      width: 420,
+      width: 640,
       margin: 1,
       errorCorrectionLevel: 'M',
       color: { dark: '#0b1f2a', light: '#ffffff' },
