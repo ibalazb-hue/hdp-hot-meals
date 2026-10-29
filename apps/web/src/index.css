@@ -50,7 +50,7 @@ textarea {
 }
 
 #qr-reader {
-  min-height: min(58dvh, 24rem);
+  min-height: 16rem;
   flex: 1;
   border: none !important;
   background: #0a3540;
@@ -63,7 +63,7 @@ textarea {
 #qr-reader video {
   width: 100% !important;
   height: 100% !important;
-  min-height: min(58dvh, 24rem);
+  min-height: 16rem;
   object-fit: cover;
   border-radius: 0;
 }
@@ -617,4 +617,13 @@ textarea {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+}
+
+/* Hide scrollbars on horizontally scrolling rows (nav, header chips) */
+.nav-scroll {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.nav-scroll::-webkit-scrollbar {
+  display: none;
 }

@@ -122,7 +122,7 @@ export function ScanPage() {
   const rejectText = reasonLabel(t, result?.messageKey ?? result?.blockReason ?? 'unknown')
 
   return (
-    <div className="relative flex min-h-full flex-1 flex-col gap-2 pb-1 sm:h-full sm:min-h-0 sm:overflow-hidden">
+    <div className="relative flex min-h-full flex-1 flex-col gap-3 pb-1 sm:h-full sm:min-h-0 sm:gap-2 sm:overflow-hidden">
       {result ? null : <PageHeader title={t('scan')} subtitle={t('tileScan')} />}
       {result ? (
         <div className="absolute inset-0 z-10 overflow-y-auto bg-canvas">
@@ -198,7 +198,7 @@ export function ScanPage() {
       ) : null}
       <div className="flex shrink-0 items-center gap-2">
         {dps.length > 1 ? (
-          <SelectInput data-testid="dp" className="min-h-11 flex-1" value={dp} onChange={(event) => setDp(event.target.value)}>
+          <SelectInput data-testid="dp" className="min-h-10 flex-1 text-sm font-semibold" value={dp} onChange={(event) => setDp(event.target.value)}>
             {dps.map((code) => (
               <option key={code} value={code}>
                 {code}
@@ -206,7 +206,7 @@ export function ScanPage() {
             ))}
           </SelectInput>
         ) : (
-          <p className="flex-1 font-bold" dir="ltr">
+          <p className="flex-1 rounded-xl bg-mist px-3 py-2 text-sm font-bold text-teal" dir="ltr">
             {dp}
           </p>
         )}
@@ -214,8 +214,8 @@ export function ScanPage() {
           {t('torch')}
         </Button>
       </div>
-      <div className="flex flex-1 flex-col gap-2 sm:min-h-0 sm:overflow-hidden">
-        <div className="scan-stage flex min-h-[min(58dvh,24rem)] flex-1 flex-col overflow-hidden rounded-2xl bg-teal shadow-sm sm:min-h-[min(72dvh,36rem)]">
+      <div className="flex flex-1 flex-col gap-3 sm:min-h-0 sm:gap-2 sm:overflow-hidden">
+        <div className="scan-stage flex aspect-square max-h-[60dvh] min-h-[16rem] w-full flex-col overflow-hidden rounded-2xl bg-teal shadow-sm sm:aspect-auto sm:max-h-none sm:flex-1 sm:min-h-[min(72dvh,36rem)]">
           <div id="qr-reader" className="min-h-0 flex-1" data-testid="qr-stage" />
         </div>
         <Panel className="shrink-0 !p-3">
