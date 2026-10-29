@@ -50,7 +50,7 @@ textarea {
 }
 
 #qr-reader {
-  min-height: min(68dvh, 32rem);
+  min-height: min(58dvh, 24rem);
   flex: 1;
   border: none !important;
   background: #0a3540;
@@ -63,7 +63,7 @@ textarea {
 #qr-reader video {
   width: 100% !important;
   height: 100% !important;
-  min-height: min(68dvh, 32rem);
+  min-height: min(58dvh, 24rem);
   object-fit: cover;
   border-radius: 0;
 }
@@ -79,6 +79,13 @@ textarea {
 #qr-reader__scan_region img,
 #qr-reader__scan_region > div {
   max-width: none !important;
+}
+
+@media (min-width: 640px) {
+  #qr-reader,
+  #qr-reader video {
+    min-height: min(68dvh, 32rem);
+  }
 }
 
 #qr-reader__dashboard_section,

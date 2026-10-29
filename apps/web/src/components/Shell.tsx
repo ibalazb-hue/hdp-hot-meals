@@ -94,20 +94,20 @@ export function Shell() {
       >
         <header className="no-print sticky top-0 z-20 bg-teal text-white">
           <button
-            className="flex w-full items-center justify-center bg-white px-4 py-2.5"
+            className="flex w-full items-center justify-center bg-white px-4 py-1.5 sm:py-2.5"
             onClick={() => navigate('/')}
             aria-label={t('appName')}
           >
-            <BrandLogos className="h-12" />
+            <BrandLogos className="h-8 sm:h-12" />
           </button>
-          <div className="flex items-start justify-between gap-3 px-4 pt-3">
+          <div className="flex items-start justify-between gap-3 px-4 pt-2 sm:pt-3">
             <button className="min-w-0 flex-1 text-start" onClick={() => navigate('/')}>
-              <span className="block text-sm font-bold leading-snug sm:text-base">{t('appName')}</span>
-              <span className="block truncate text-xs text-white/70">{t('appPlace')}</span>
+              <span className="block truncate text-sm font-bold leading-snug sm:whitespace-normal sm:text-base">{t('appName')}</span>
+              <span className="hidden truncate text-xs text-white/70 sm:block">{t('appPlace')}</span>
             </button>
             <RoleBadge role={role} label={t(ROLE_LABEL[role])} />
           </div>
-          <div className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm">
+          <div className="flex flex-wrap items-center gap-1.5 px-4 py-2 text-sm sm:gap-2 sm:py-3">
             <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${online ? 'bg-white/15' : 'bg-warn text-white'}`}>
               {online ? t('online') : t('offline')}
             </span>

@@ -122,7 +122,7 @@ export function ScanPage() {
   const rejectText = reasonLabel(t, result?.messageKey ?? result?.blockReason ?? 'unknown')
 
   return (
-    <div className="relative flex h-full min-h-0 flex-1 flex-col gap-2 overflow-hidden pb-1">
+    <div className="relative flex min-h-full flex-1 flex-col gap-2 pb-1 sm:h-full sm:min-h-0 sm:overflow-hidden">
       {result ? null : <PageHeader title={t('scan')} subtitle={t('tileScan')} />}
       {result ? (
         <div className="absolute inset-0 z-10 overflow-y-auto bg-canvas">
@@ -214,8 +214,8 @@ export function ScanPage() {
           {t('torch')}
         </Button>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-        <div className="scan-stage flex min-h-[min(68dvh,32rem)] flex-1 flex-col overflow-hidden rounded-2xl bg-teal shadow-sm sm:min-h-[min(72dvh,36rem)]">
+      <div className="flex flex-1 flex-col gap-2 sm:min-h-0 sm:overflow-hidden">
+        <div className="scan-stage flex min-h-[min(58dvh,24rem)] flex-1 flex-col overflow-hidden rounded-2xl bg-teal shadow-sm sm:min-h-[min(72dvh,36rem)]">
           <div id="qr-reader" className="min-h-0 flex-1" data-testid="qr-stage" />
         </div>
         <Panel className="shrink-0 !p-3">
