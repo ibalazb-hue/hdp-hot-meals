@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { normalizeHhCode } from '@hdp/rules'
 import { apiJson } from '../api'
 import { explainError } from '../errors'
-import { chunkCards, QrCard } from '../components/QrCard'
+import { QrCard } from '../components/QrCard'
+import { buildCardsPdf } from '../cardsPdf'
 import { Alert, Button, EmptyState, Field, PageHeader, Panel, SelectInput, TextInput } from '../components/ui'
 import { useI18n } from '../i18n'
 
@@ -106,8 +107,8 @@ export function CardsPage() {
       .catch(() => setDps([]))
   }, [])
 
-  const frontPages = useMemo(() => chunkCards(bulkPack, 3), [bulkPack])
-  const backPages = useMemo(() => chunkCards(bulkPack, 3), [bulkPack])
+  const pdfRoot = useRef<HTMLDivElement>(null)
+  const [pdfProgress, setPdfProgress] = useState('')
 
   async function search() {
     const list = await apiJson<Household[]>(`/api/households?q=${encodeURIComponent(query)}`)
@@ -188,14 +189,22 @@ export function CardsPage() {
       setSelected(null)
       setTone('ok')
       setMessage(t('bulkPrintReady').replace('{n}', String(pack.length)))
-      // Wait a tick so React paints the sheet, then open the print dialog (Save as PDF).
-      window.setTimeout(() => window.print(), 400)
+      // Let React paint the offscreen sheet, then rasterise to one multi-page PDF.
+      await new Promise((r) => window.setTimeout(r, 300))
+      if (!pdfRoot.current) throw new Error('pdf_root_missing')
+      const stamp = new Date().toISOString().slice(0, 10)
+      await buildCardsPdf(pdfRoot.current, `hdp-cards-${stamp}.pdf`, (done, total) =>
+        setPdfProgress(`${done}/${total}`),
+      )
+      setMessage(t('bulkPrintReady').replace('{n}', String(pack.length)))
+      setBulkActive(false)
     } catch (err) {
       setTone('danger')
       setMessage(explainError(t, err))
       setBulkActive(false)
     } finally {
       setBulkLoading(false)
+      setPdfProgress('')
     }
   }
 
@@ -231,7 +240,7 @@ export function CardsPage() {
             disabled={bulkLoading}
             onClick={() => void bulkPrintAll()}
           >
-            {bulkLoading ? t('loading') : t('bulkPrintPdf')}
+            {bulkLoading ? `${t('loading')} ${pdfProgress}` : t('bulkPrintPdf')}
           </Button>
         </div>
         <p className="text-xs text-muted">{t('bulkPrintHint')}</p>
@@ -318,22 +327,16 @@ export function CardsPage() {
         </div>
       ) : null}
 
-      <div className={`bulk-print-sheet${bulkActive ? ' is-active' : ''}`} aria-hidden={!bulkActive}>
-        {frontPages.map((group, pageIndex) => (
-          <div className="a4-page a4-fronts" key={`fronts-${pageIndex}`}>
-            {group.map((hh) => (
-              <QrCard key={`f-${hh.hhCode}`} {...cardProps(hh)} face="front" hidePrintButton />
-            ))}
-          </div>
-        ))}
-        {backPages.map((group, pageIndex) => (
-          <div className="a4-page a4-backs" key={`backs-${pageIndex}`}>
-            {group.map((hh) => (
-              <QrCard key={`b-${hh.hhCode}`} {...cardProps(hh)} face="back" hidePrintButton />
-            ))}
-          </div>
-        ))}
-      </div>
+      {bulkActive ? (
+        <div ref={pdfRoot} className="pdf-render-root" aria-hidden="true">
+          {bulkPack.map((hh) => (
+            <div className="pdf-row" data-pdf-row key={`pdf-${hh.hhCode}`}>
+              <QrCard {...cardProps(hh)} face="front" hidePrintButton />
+              <QrCard {...cardProps(hh)} face="back" hidePrintButton />
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }
