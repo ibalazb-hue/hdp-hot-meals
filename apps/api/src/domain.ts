@@ -659,7 +659,7 @@ export function defaultCardTemplate(): CardTemplate {
   const hdpHotline = process.env.HDP_HOTLINE?.trim() || ''
   return {
     titleEn: 'Beneficiary household card',
-    titleAr: 'بطاقة استحقاق - مجاناً',
+    titleAr: 'بطاقة أسرة مستفيدة',
     projectTitleAr: 'مشروع المطبخ المجتمعي',
     primaryColor: '#0B5C6B',
     showWfpLogo: true,
@@ -717,7 +717,7 @@ export function normalizeCardTemplate(input: Partial<CardTemplate> | null | unde
   const hdpPhoneRaw = (input.hdpPhone != null ? String(input.hdpPhone) : base.hdpPhone).trim().slice(0, 80)
   return {
     titleEn: (input.titleEn != null ? String(input.titleEn) : base.titleEn).replace(/\b(hot|cooked)\s+/gi, '').trim().slice(0, 120) || base.titleEn,
-    titleAr: legacyTitle((input.titleAr != null ? String(input.titleAr) : base.titleAr).trim().slice(0, 120), ['بطاقة أسرة مستفيدة', 'بطاقة استحقاق وجبة ساخنة - مجاناً']) || base.titleAr,
+    titleAr: legacyTitle((input.titleAr != null ? String(input.titleAr) : base.titleAr).trim().slice(0, 120), ['بطاقة استحقاق - مجاناً', 'بطاقة استحقاق وجبة ساخنة - مجاناً']) || base.titleAr,
     projectTitleAr: legacyTitle((input.projectTitleAr != null ? String(input.projectTitleAr) : base.projectTitleAr).trim().slice(0, 120), ['المطبخ المجتمعي']) || base.projectTitleAr,
     primaryColor: normalizePrimaryColor(input.primaryColor != null ? String(input.primaryColor) : base.primaryColor),
     showWfpLogo: input.showWfpLogo !== false,
