@@ -40,6 +40,7 @@ import {
   type Actor,
   type IncomingScan,
 } from './domain.js'
+import { FEEDS, feed, powerBiKeyStatus, revokePowerBiKey, rotatePowerBiKey, toCsv, verifyPowerBiKey, type FeedName } from './powerbi.js'
 
 const uuid = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -93,8 +94,35 @@ export function createApp(db: Database, options?: { distDir?: string }) {
     return c.json({ ...token, user: actor })
   })
 
+  // Power BI / Excel read-only data feed (API key or admin/meal bearer token)
+  app.get('/api/powerbi/:feed', async (c) => {
+    const name = c.req.param('feed').replace(/\.(csv|json)$/, '') as FeedName
+    if (!FEEDS.includes(name)) throw new HttpError(404, 'not_found')
+    const key = c.req.query('key') || c.req.header('x-api-key') || ''
+    let ok = await verifyPowerBiKey(db, key)
+    if (!ok) {
+      const header = c.req.header('authorization') ?? ''
+      if (header.startsWith('Bearer ')) {
+        const actor = await loadActor(db, await readSubject(header.slice(7))).catch(() => null)
+        ok = Boolean(actor && (actor.role === 'admin' || actor.role === 'meal'))
+      }
+    }
+    if (!ok) throw new HttpError(401, 'unauthorized')
+    const q = (k: string) => c.req.query(k) || undefined
+    for (const k of ['from', 'to']) if (q(k) && !day.safeParse(q(k)).success) throw new HttpError(400, 'invalid_body')
+    const rows = await feed(db, name, { from: q('from'), to: q('to'), dp: q('dp'), district: q('district'), operator: q('operator') })
+    const wantsCsv = c.req.param('feed').endsWith('.csv') || c.req.query('format') === 'csv'
+    c.header('cache-control', 'no-store')
+    if (wantsCsv) {
+      return new Response(toCsv(rows), {
+        headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="hdp-${name}.csv"`, 'cache-control': 'no-store' },
+      })
+    }
+    return c.json(rows)
+  })
+
   app.use('/api/*', async (c, next) => {
-    if (c.req.path === '/api/health' || c.req.path === '/api/auth/login') return next()
+    if (c.req.path === '/api/health' || c.req.path === '/api/auth/login' || c.req.path.startsWith('/api/powerbi/')) return next()
     const header = c.req.header('authorization') ?? ''
     const token = header.startsWith('Bearer ') ? header.slice(7) : ''
     if (!token) throw new HttpError(401, 'unauthorized')
@@ -322,6 +350,12 @@ export function createApp(db: Database, options?: { distDir?: string }) {
       }),
     ),
   )
+  app.get('/api/admin/powerbi-key', async (c) => {
+    if (c.get('actor').role !== 'admin') throw new HttpError(403, 'forbidden')
+    return c.json(await powerBiKeyStatus(db))
+  })
+  app.post('/api/admin/powerbi-key', async (c) => c.json(await rotatePowerBiKey(db, c.get('actor'))))
+  app.delete('/api/admin/powerbi-key', async (c) => c.json(await revokePowerBiKey(db, c.get('actor'))))
   app.get('/api/admin/card-template', async (c) => c.json(await getCardTemplate(db)))
   app.put('/api/admin/card-template', async (c) => {
     const body = parse(

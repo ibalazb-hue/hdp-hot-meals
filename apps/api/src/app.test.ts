@@ -796,3 +796,30 @@ describe('reports', () => {
     expect(denied.status).toBe(403)
   })
 })
+
+describe('power bi feed', () => {
+  it('requires a key, serves JSON/CSV with key, and blocks after revoke', async () => {
+    const admin = await login('admin.taiz')
+    expect((await app.request('/api/powerbi/daily')).status).toBe(401)
+    const rot = await app.request('/api/admin/powerbi-key', { method: 'POST', headers: auth(admin.token) })
+    const { key } = (await rot.json()) as { key: string }
+    expect(key.startsWith('hdpbi_')).toBe(true)
+    const dps = await app.request(`/api/powerbi/distribution_points?key=${key}`)
+    expect(dps.status).toBe(200)
+    expect(((await dps.json()) as unknown[]).length).toBeGreaterThan(0)
+    for (const f of ['focal_points', 'households', 'production', 'scans', 'daily', 'cards']) {
+      const r = await app.request(`/api/powerbi/${f}?from=2026-01-01&to=2030-01-01`, { headers: { 'x-api-key': key } })
+      expect(r.status, f).toBe(200)
+    }
+    const fp = (await (await app.request(`/api/powerbi/focal_points?key=${key}`)).text())
+    expect(fp).not.toContain('password')
+    const csv = await app.request(`/api/powerbi/households.csv?key=${key}`)
+    expect(csv.headers.get('content-type')).toContain('text/csv')
+    const meal = await login('meal.taiz')
+    expect((await app.request('/api/powerbi/daily', { headers: auth(meal.token) })).status).toBe(200)
+    const focal = await login('focal.mudhaffar')
+    expect((await app.request('/api/powerbi/daily', { headers: auth(focal.token) })).status).toBe(401)
+    await app.request('/api/admin/powerbi-key', { method: 'DELETE', headers: auth(admin.token) })
+    expect((await app.request(`/api/powerbi/daily?key=${key}`)).status).toBe(401)
+  })
+})

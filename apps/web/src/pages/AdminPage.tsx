@@ -4,6 +4,7 @@ import { apiJson } from '../api'
 import { useAuth } from '../auth'
 import { AuditLogPanel } from '../components/AuditLogPanel'
 import { CardTemplateAdmin } from '../components/CardTemplateAdmin'
+import { PowerBiPanel } from '../components/PowerBiPanel'
 import { Alert, Button, EmptyState, Field, PageHeader, Panel, RoleBadge, Segmented, SelectInput, StatusPill, TextInput } from '../components/ui'
 import { explainError } from '../errors'
 import { useI18n, type CopyKey } from '../i18n'
@@ -71,7 +72,7 @@ interface DpEdit {
   otherIds: string[]
 }
 
-type Tab = 'access' | 'points' | 'cards' | 'audit' | 'devices'
+type Tab = 'access' | 'points' | 'cards' | 'audit' | 'devices' | 'powerbi'
 
 const DP_CODE = /^[A-Z0-9]{2,8}$/
 const USERNAME_OK = /^[a-z0-9._-]{3,32}$/
@@ -520,6 +521,7 @@ export function AdminPage() {
           { value: 'cards', label: t('cardTemplate') },
           { value: 'audit', label: t('auditLog') },
           { value: 'devices', label: t('devices') },
+          { value: 'powerbi', label: 'Power BI' },
         ]}
       />
 
@@ -1058,6 +1060,8 @@ export function AdminPage() {
       {tab === 'cards' ? <CardTemplateAdmin /> : null}
 
       {tab === 'audit' ? <AuditLogPanel /> : null}
+
+      {tab === 'powerbi' ? <PowerBiPanel /> : null}
 
       {tab === 'devices' ? (
         <Panel>

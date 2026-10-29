@@ -40,3 +40,15 @@ Sample card `CMDF01000101` is household `TZ-MDF01-000101`. `CMDF01000103` is voi
 - A manual household code with the supervisor PIN is a ManualException, including at another point. It still cannot add a second meal or revive a voided card.
 - If two tablets both serve offline, the earlier device time wins. The other row stays in the audit as a duplicate and does not count.
 - Unscanned meals are not distributions. Reconciliation compares meals prepared with unique counting scans and alerts above 1%.
+
+## Power BI / Excel data feed (read-only)
+
+1. Admin → **Power BI** tab → **Generate key** (shown once; rotate or revoke any time; stored hashed).
+2. Power BI Desktop → **Get data → Web** → paste e.g.
+   `https://hdp-hot-meals.onrender.com/api/powerbi/daily?key=YOUR_KEY` → credentials **Anonymous** → To Table / expand.
+3. Tables: `daily` (prepared vs served per DP per day), `scans`, `production`, `households` (no holder names),
+   `cards`, `distribution_points`, `focal_points`.
+4. Filters: `from`, `to` (YYYY-MM-DD), `dp`, `district` (`Al-Mudhaffar` | `Al-Qahira`), `operator` (user id).
+   CSV: append `.csv` (e.g. `/api/powerbi/daily.csv?key=…`) or `format=csv`. Key may also be sent as `X-API-Key`.
+5. Relate tables on `dp_code`, `hh_code`, `date`. Schedule refresh in Power BI Service with Anonymous auth.
+   Admin/meal bearer tokens are also accepted. Never commit the key.
