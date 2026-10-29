@@ -70,6 +70,21 @@ describe('meal scans', () => {
     expect(stored.locationAccuracyM).toBe(18)
   })
 
+  it('serves a new household when the QR holds its household code', async () => {
+    const meal = await login('meal.taiz')
+    const focal = await login('focal.mudhaffar')
+    const created = await app.request('/api/households', {
+      method: 'POST',
+      headers: auth(meal.token),
+      body: JSON.stringify({ dpCode: 'MDF01', beneficiaryCount: 4, label: 'QR hh test' }),
+    })
+    expect(created.status).toBe(201)
+    const hh = (await created.json()) as { hhCode: string }
+    const served = await postScan(focal.token, scan(focal.user.id, { cardCode: hh.hhCode.toLowerCase() }))
+    expect(served.status).toBe(200)
+    expect(served.json.scan?.result).toBe('Served')
+  })
+
   it('serves once per household per Aden day and blocks the second scan', async () => {
     const focal = await login('focal.mudhaffar')
     const first = await postScan(focal.token, scan(focal.user.id))

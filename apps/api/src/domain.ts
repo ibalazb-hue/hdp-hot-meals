@@ -277,6 +277,15 @@ async function lookupHousehold(tx: Queryable, scan: IncomingScan) {
       [cardCode],
     )
     if (historical[0]) return { household: mapHousehold(historical[0]), knownVoided: true, cardCode }
+    // Printed entitlement cards encode the household code in the QR, so accept it here too.
+    const byHh = await tx.query(
+      `SELECT hh_code, dp_code, status, active_card_code, beneficiary_count FROM households WHERE hh_code = $1`,
+      [normalizeHhCode(cardCode)],
+    )
+    if (byHh[0]) {
+      const household = mapHousehold(byHh[0])
+      return { household, knownVoided: false, cardCode: household.activeCardCode ?? cardCode }
+    }
     return { household: null, knownVoided: false, cardCode }
   }
   const hhCode = scan.hhCode ? normalizeHhCode(scan.hhCode) : ''

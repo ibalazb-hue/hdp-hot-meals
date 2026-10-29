@@ -92,7 +92,7 @@ async function pinMatches(pin: string | null | undefined): Promise<boolean> {
 async function localDecision(input: ScanRequest, clientScanId: string, scannedAt: string, authorized: boolean) {
   let household: BundleHousehold | null = null
   let knownVoided = false
-  const cardCode = input.cardCode?.trim().toUpperCase() || null
+  let cardCode = input.cardCode?.trim().toUpperCase() || null
   const hhCode = input.hhCode?.trim().toUpperCase() || null
   if (input.mode === 'card' && cardCode) {
     household = (await db.households.where('activeCardCode').equals(cardCode).first()) ?? null
@@ -102,6 +102,10 @@ async function localDecision(input: ScanRequest, clientScanId: string, scannedAt
         knownVoided = true
         household = (await db.households.get(voided.hhCode)) ?? null
       }
+    }
+    if (!household) {
+      household = (await db.households.get(cardCode)) ?? null
+      if (household?.activeCardCode) cardCode = household.activeCardCode
     }
   } else if (hhCode) {
     household = (await db.households.get(hhCode)) ?? null
@@ -319,7 +323,8 @@ export async function submitScan(input: ScanRequest): Promise<LocalScan> {
 }
 
 export function readCard(raw: string): string | null {
-  return parseCardPayload(raw).cardCode ?? null
+  const parsed = parseCardPayload(raw)
+  return parsed.cardCode ?? parsed.hhCode ?? null
 }
 
 export async function flushQueue(): Promise<number> {

@@ -40,6 +40,7 @@ export function ScanPage() {
   const [torch, setTorch] = useState(false)
   const handler = useRef<(raw: string) => void>(() => undefined)
   const showing = useRef(false)
+  const busy = useRef(false)
   const resultRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -79,9 +80,16 @@ export function ScanPage() {
 
   handler.current = (raw: string) => {
     if (showing.current) return
+    if (busy.current) return
     const cardCode = readCard(raw)
-    if (!cardCode) return
-    void record(cardCode)
+    if (!cardCode) {
+      setError(t('unknown'))
+      return
+    }
+    busy.current = true
+    void record(cardCode).finally(() => {
+      busy.current = false
+    })
   }
 
   useEffect(() => {
@@ -227,6 +235,7 @@ export function ScanPage() {
               const raw = field instanceof HTMLInputElement ? field.value : card
               const cardCode = readCard(raw)
               if (cardCode) void record(cardCode)
+              else setError(t('unknown'))
             }}
           >
             <TextInput
