@@ -776,3 +776,23 @@ describe('admin audit log', () => {
     expect(prodOnly.every((r) => r.entityType === 'production')).toBe(true)
   })
 })
+describe('reports', () => {
+  it('aggregates served scans by DP and district for MEAL; blocks dp_focal', async () => {
+    const focal = await login('focal.mudhaffar')
+    expect((await postScan(focal.token, scan(focal.user.id))).status).toBeLessThan(300)
+    const meal = await login('meal.taiz')
+    const today = adenDate()
+    const res = await app.request(`/api/reports?from=${today}&to=${today}`, { headers: auth(meal.token) })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { totals: { served: number; uniqueHh: number }; byDp: Array<{ dpCode: string; served: number }>; byDistrict: unknown[]; byDay: unknown[] }
+    expect(body.totals.served).toBe(1)
+    expect(body.totals.uniqueHh).toBe(1)
+    expect(body.byDp.find((r) => r.dpCode === 'MDF01')?.served).toBe(1)
+    expect(body.byDistrict.length).toBeGreaterThan(0)
+    expect(body.byDay.length).toBe(1)
+    const filtered = await app.request(`/api/reports?from=${today}&to=${today}&district=Al-Qahira`, { headers: auth(meal.token) })
+    expect(((await filtered.json()) as { totals: { served: number } }).totals.served).toBe(0)
+    const denied = await app.request(`/api/reports?from=${today}&to=${today}`, { headers: auth(focal.token) })
+    expect(denied.status).toBe(403)
+  })
+})

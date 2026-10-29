@@ -15,6 +15,7 @@ const NAV: Record<Role, Array<{ to: string; key: CopyKey }>> = {
   ],
   meal: [
     { to: '/dashboard', key: 'dashboard' },
+    { to: '/reports', key: 'reports' },
     { to: '/register', key: 'register' },
     { to: '/reconcile', key: 'reconcile' },
     { to: '/cards', key: 'cards' },
@@ -22,11 +23,13 @@ const NAV: Record<Role, Array<{ to: string; key: CopyKey }>> = {
   supervisor: [
     { to: '/scan', key: 'scan' },
     { to: '/dashboard', key: 'dashboard' },
+    { to: '/reports', key: 'reports' },
     { to: '/reconcile', key: 'reconcile' },
     { to: '/export', key: 'export' },
   ],
   admin: [
     { to: '/dashboard', key: 'dashboard' },
+    { to: '/reports', key: 'reports' },
     { to: '/reconcile', key: 'reconcile' },
     { to: '/admin', key: 'admin' },
     { to: '/register', key: 'register' },
@@ -44,6 +47,7 @@ const ICONS: Partial<Record<CopyKey, IconName>> = {
   scan: 'scan',
   manual: 'manual',
   dashboard: 'dashboard',
+  reports: 'reconcile',
   register: 'register',
   cards: 'cards',
   export: 'export',

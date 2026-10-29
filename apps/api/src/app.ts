@@ -31,6 +31,7 @@ import {
   deleteUser,
   updateUser,
   reconciliation,
+  reports,
   reissueCard,
   saveCardTemplate,
   syncBundle,
@@ -194,6 +195,22 @@ export function createApp(db: Database, options?: { distDir?: string }) {
     const date = c.req.query('date') ?? adenDate()
     if (!day.safeParse(date).success) throw new HttpError(400, 'invalid_body')
     return c.json(await reconciliation(db, c.get('actor'), date))
+  })
+  app.get('/api/reports', async (c) => {
+    const to = c.req.query('to') ?? adenDate()
+    const from = c.req.query('from') ?? to
+    if (!day.safeParse(from).success || !day.safeParse(to).success) throw new HttpError(400, 'invalid_body')
+    const district = c.req.query('district') || undefined
+    if (district && !['Al-Mudhaffar', 'Al-Qahira'].includes(district)) throw new HttpError(400, 'invalid_body')
+    return c.json(
+      await reports(db, c.get('actor'), {
+        from,
+        to,
+        dp: c.req.query('dp') || undefined,
+        district,
+        operator: c.req.query('operator') || undefined,
+      }),
+    )
   })
   app.post('/api/spot-checks', async (c) => {
     const body = parse(

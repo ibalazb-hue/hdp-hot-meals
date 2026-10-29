@@ -10,9 +10,9 @@ import { Icon, RoleBadge, type IconName } from '../components/ui'
 
 const LINKS: Record<Role, CopyKey[]> = {
   dp_focal: ['scan', 'manual', 'dashboard', 'sop'],
-  meal: ['dashboard', 'register', 'reconcile', 'cards', 'export', 'sop'],
-  supervisor: ['scan', 'manual', 'dashboard', 'reconcile', 'export', 'sop'],
-  admin: ['dashboard', 'reconcile', 'admin', 'register', 'cards', 'export', 'sop'],
+  meal: ['dashboard', 'reports', 'register', 'reconcile', 'cards', 'export', 'sop'],
+  supervisor: ['scan', 'manual', 'dashboard', 'reports', 'reconcile', 'export', 'sop'],
+  admin: ['dashboard', 'reports', 'reconcile', 'admin', 'register', 'cards', 'export', 'sop'],
 }
 
 const ROLE_LABEL: Record<Role, CopyKey> = {
@@ -26,6 +26,7 @@ const PATH: Partial<Record<CopyKey, string>> = {
   scan: '/scan',
   manual: '/manual',
   dashboard: '/dashboard',
+  reports: '/reports',
   register: '/register',
   cards: '/cards',
   reconcile: '/reconcile',
@@ -38,6 +39,7 @@ const DESC: Partial<Record<CopyKey, CopyKey>> = {
   scan: 'tileScan',
   manual: 'tileManual',
   dashboard: 'tileDashboard',
+  reports: 'tileReports',
   register: 'tileRegister',
   cards: 'tileCards',
   reconcile: 'tileReconcile',
@@ -108,6 +110,7 @@ export function HomePage() {
     scan: 'scan',
     manual: 'manual',
     dashboard: 'dashboard',
+    reports: 'reconcile',
     register: 'register',
     cards: 'cards',
     reconcile: 'reconcile',

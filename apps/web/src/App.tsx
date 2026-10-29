@@ -11,6 +11,7 @@ import { ExportPage } from './pages/ExportPage'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { ManualPage } from './pages/ManualPage'
+import { ReportsPage } from './pages/ReportsPage'
 import { ReconcilePage } from './pages/ReconcilePage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ScanPage } from './pages/ScanPage'
@@ -42,6 +43,7 @@ export function App() {
           <Route path="/register" element={<Screen roles={['meal', 'admin']}><RegisterPage /></Screen>} />
           <Route path="/cards" element={<Screen roles={['meal', 'admin', 'supervisor']}><CardsPage /></Screen>} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/reports" element={<Screen roles={['meal', 'supervisor', 'admin']}><ReportsPage /></Screen>} />
           <Route path="/reconcile" element={<Screen roles={['meal', 'supervisor', 'admin']}><ReconcilePage /></Screen>} />
           <Route path="/export" element={<Screen roles={['meal', 'supervisor', 'admin']}><ExportPage /></Screen>} />
           <Route path="/admin" element={<Screen roles={['admin']}><AdminPage /></Screen>} />

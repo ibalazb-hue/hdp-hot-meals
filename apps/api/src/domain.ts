@@ -1945,3 +1945,208 @@ export async function listDevices(db: Database) {
     active: asBool(row.active),
   }))
 }
+
+export interface ReportFilters {
+  from: string
+  to: string
+  dp?: string
+  district?: string
+  operator?: string
+}
+
+/** MEAL reports: prepared vs served, scans by DP/district/focal point, overrides, voids/reissues. */
+export async function reports(db: Database, actor: Actor, filters: ReportFilters) {
+  if (actor.role === 'dp_focal') throw new HttpError(403, 'forbidden')
+  if (filters.from > filters.to) throw new HttpError(400, 'invalid_body')
+  const accessible = await accessibleDpCodes(db, actor)
+  const dpMeta = await db.query(
+    `SELECT code, name_en, name_ar, district FROM distribution_points WHERE code = ANY($1::text[]) ORDER BY code`,
+    [accessible],
+  )
+  let codes = dpMeta.map((r) => String(r.code))
+  if (filters.dp) codes = codes.filter((c) => c === filters.dp!.toUpperCase())
+  if (filters.district) {
+    codes = codes.filter((c) => String(dpMeta.find((r) => r.code === c)?.district) === filters.district)
+  }
+  const operator = filters.operator || null
+  const scanArgs = [codes, filters.from, filters.to, operator]
+  const scanWhere = `s.dp_code = ANY($1::text[]) AND s.scan_date BETWEEN $2 AND $3 AND ($4::text IS NULL OR s.operator_id = $4)`
+
+  const scanAgg = `
+    COUNT(*) FILTER (WHERE s.counts_as_distributed) AS served,
+    COUNT(*) FILTER (WHERE s.result = 'Blocked') AS blocked,
+    COUNT(*) FILTER (WHERE s.result = 'Override') AS overrides,
+    COUNT(*) FILTER (WHERE s.result = 'ManualException') AS manual,
+    COUNT(*) FILTER (WHERE s.offline_flag) AS offline,
+    COUNT(DISTINCT s.hh_code) FILTER (WHERE s.counts_as_distributed) AS unique_hh,
+    COUNT(*) AS scans`
+
+  const [byDpScan, byDayScan, byOpScan, prodByDp, prodByDay, cardActs, blockReasons, operators] = await Promise.all([
+    db.query(`SELECT s.dp_code, ${scanAgg} FROM meal_scans s WHERE ${scanWhere} GROUP BY s.dp_code`, scanArgs),
+    db.query(`SELECT s.scan_date AS d, ${scanAgg} FROM meal_scans s WHERE ${scanWhere} GROUP BY s.scan_date`, scanArgs),
+    db.query(
+      `SELECT s.operator_id, u.display_name, u.username, u.role, ${scanAgg}
+       FROM meal_scans s JOIN users u ON u.id = s.operator_id WHERE ${scanWhere}
+       GROUP BY s.operator_id, u.display_name, u.username, u.role ORDER BY served DESC`,
+      scanArgs,
+    ),
+    db.query(
+      `SELECT dp_code, SUM(meals_prepared) AS prepared, COUNT(*) AS days FROM daily_production
+       WHERE dp_code = ANY($1::text[]) AND production_date BETWEEN $2 AND $3 GROUP BY dp_code`,
+      [codes, filters.from, filters.to],
+    ),
+    db.query(
+      `SELECT production_date AS d, SUM(meals_prepared) AS prepared FROM daily_production
+       WHERE dp_code = ANY($1::text[]) AND production_date BETWEEN $2 AND $3 GROUP BY production_date`,
+      [codes, filters.from, filters.to],
+    ),
+    db.query(
+      `SELECT h.dp_code, ci.action, COUNT(*) AS n FROM card_issuance ci JOIN households h ON h.hh_code = ci.hh_code
+       WHERE h.dp_code = ANY($1::text[]) AND (ci.created_at AT TIME ZONE 'Asia/Aden')::date BETWEEN $2::date AND $3::date
+       GROUP BY h.dp_code, ci.action`,
+      [codes, filters.from, filters.to],
+    ),
+    db.query(
+      `SELECT COALESCE(s.block_reason, 'other') AS reason, COUNT(*) AS n FROM meal_scans s
+       WHERE ${scanWhere} AND s.result = 'Blocked' GROUP BY 1 ORDER BY n DESC`,
+      scanArgs,
+    ),
+    db.query(
+      `SELECT DISTINCT u.id, u.display_name, u.username, u.role FROM users u
+       LEFT JOIN user_dps ud ON ud.user_id = u.id
+       WHERE u.role IN ('dp_focal','supervisor') AND (ud.dp_code = ANY($1::text[]) OR $2::boolean)
+       ORDER BY u.display_name`,
+      [accessible, actor.role === 'admin'],
+    ),
+  ])
+
+  const num = (v: unknown) => Number(v ?? 0)
+  const hhRows = await db.query(
+    `SELECT dp_code, COUNT(*) FILTER (WHERE active_card_code IS NOT NULL) AS active_cards,
+            COALESCE(SUM(beneficiary_count) FILTER (WHERE active_card_code IS NOT NULL), 0) AS people
+     FROM households WHERE dp_code = ANY($1::text[]) GROUP BY dp_code`,
+    [codes],
+  )
+
+  const byDp = codes.map((code) => {
+    const meta = dpMeta.find((r) => r.code === code)!
+    const s = byDpScan.find((r) => r.dp_code === code)
+    const p = prodByDp.find((r) => r.dp_code === code)
+    const hh = hhRows.find((r) => r.dp_code === code)
+    const act = (a: string) => num(cardActs.find((r) => r.dp_code === code && r.action === a)?.n)
+    const prepared = p ? num(p.prepared) : null
+    const served = num(s?.served)
+    return {
+      dpCode: code,
+      nameEn: String(meta.name_en),
+      nameAr: String(meta.name_ar),
+      district: String(meta.district),
+      activeCards: num(hh?.active_cards),
+      people: num(hh?.people),
+      productionDays: num(p?.days),
+      prepared,
+      served,
+      variance: prepared == null ? null : prepared - served,
+      blocked: num(s?.blocked),
+      overrides: num(s?.overrides),
+      manual: num(s?.manual),
+      offline: num(s?.offline),
+      scans: num(s?.scans),
+      uniqueHh: num(s?.unique_hh),
+      issued: act('issue'),
+      voided: act('void'),
+      reissued: act('reissue'),
+    }
+  })
+
+  const districts = [...new Set(byDp.map((r) => r.district))].map((district) => {
+    const rows = byDp.filter((r) => r.district === district)
+    const sum = (k: keyof (typeof rows)[number]) => rows.reduce((a, r) => a + Number(r[k] ?? 0), 0)
+    const prepared = rows.some((r) => r.prepared != null) ? sum('prepared') : null
+    const served = sum('served')
+    return {
+      district,
+      dps: rows.length,
+      activeCards: sum('activeCards'),
+      prepared,
+      served,
+      variance: prepared == null ? null : prepared - served,
+      blocked: sum('blocked'),
+      overrides: sum('overrides'),
+      voided: sum('voided'),
+      reissued: sum('reissued'),
+    }
+  })
+
+  const days: string[] = []
+  for (let d = new Date(`${filters.from}T00:00:00Z`); d <= new Date(`${filters.to}T00:00:00Z`) && days.length < 400; d.setUTCDate(d.getUTCDate() + 1)) {
+    days.push(d.toISOString().slice(0, 10))
+  }
+  const byDay = days.map((d) => {
+    const s = byDayScan.find((r) => String(r.d) === d)
+    const p = prodByDay.find((r) => String(r.d) === d)
+    const prepared = p ? num(p.prepared) : null
+    const served = num(s?.served)
+    return {
+      date: d,
+      prepared,
+      served,
+      variance: prepared == null ? null : prepared - served,
+      blocked: num(s?.blocked),
+      overrides: num(s?.overrides),
+      uniqueHh: num(s?.unique_hh),
+    }
+  })
+
+  const total = (k: keyof (typeof byDp)[number]) => byDp.reduce((a, r) => a + Number(r[k] ?? 0), 0)
+  const uniqueRow = await db.query(
+    `SELECT COUNT(DISTINCT s.hh_code) AS n FROM meal_scans s WHERE ${scanWhere} AND s.counts_as_distributed`,
+    scanArgs,
+  )
+  const uniqueAll = num(uniqueRow[0]?.n)
+  const preparedTotal = byDp.some((r) => r.prepared != null) ? total('prepared') : null
+  const servedTotal = total('served')
+  return {
+    filters,
+    options: {
+      dps: dpMeta.map((r) => ({ code: String(r.code), nameEn: String(r.name_en), nameAr: String(r.name_ar), district: String(r.district) })),
+      districts: [...new Set(dpMeta.map((r) => String(r.district)))],
+      operators: operators.map((r) => ({ id: String(r.id), name: String(r.display_name || r.username), role: String(r.role) })),
+    },
+    totals: {
+      activeCards: total('activeCards'),
+      people: total('people'),
+      prepared: preparedTotal,
+      served: servedTotal,
+      variance: preparedTotal == null ? null : preparedTotal - servedTotal,
+      coveragePct: preparedTotal ? Math.round((servedTotal / preparedTotal) * 1000) / 10 : null,
+      blocked: total('blocked'),
+      overrides: total('overrides'),
+      manual: total('manual'),
+      offline: total('offline'),
+      scans: total('scans'),
+      uniqueHh: uniqueAll,
+      activeDps: byDp.filter((r) => r.scans > 0 || r.prepared != null).length,
+      totalDps: byDp.length,
+      issued: total('issued'),
+      voided: total('voided'),
+      reissued: total('reissued'),
+      days: days.length,
+    },
+    byDay,
+    byDp,
+    byDistrict: districts,
+    byOperator: byOpScan.map((r) => ({
+      id: String(r.operator_id),
+      name: String(r.display_name || r.username),
+      role: String(r.role),
+      served: num(r.served),
+      blocked: num(r.blocked),
+      overrides: num(r.overrides),
+      manual: num(r.manual),
+      offline: num(r.offline),
+      scans: num(r.scans),
+    })),
+    blockReasons: blockReasons.map((r) => ({ reason: String(r.reason), count: num(r.n) })),
+  }
+}
