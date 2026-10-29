@@ -177,6 +177,7 @@ export function createApp(db: Database, options?: { distDir?: string }) {
         dpCode: z.string().min(2).max(8),
         beneficiaryCount: z.number().int().min(1).max(30),
         label: z.string().max(80).nullish(),
+        familyName: z.string().max(80).nullish(),
       }),
       await c.req.json(),
     )
@@ -189,9 +190,10 @@ export function createApp(db: Database, options?: { distDir?: string }) {
         .object({
           dpCode: z.string().min(2).max(8).optional(),
           label: z.string().max(80).nullish(),
+          familyName: z.string().max(80).nullish(),
           beneficiaryCount: z.number().int().min(1).max(30).optional(),
         })
-        .refine((value) => value.dpCode !== undefined || value.label !== undefined || value.beneficiaryCount !== undefined, {
+        .refine((value) => value.dpCode !== undefined || value.label !== undefined || value.familyName !== undefined || value.beneficiaryCount !== undefined, {
           message: 'empty',
         }),
       await c.req.json(),

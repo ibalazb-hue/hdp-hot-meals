@@ -1,7 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import QRCode from 'qrcode'
 import { useI18n } from '../i18n'
-import { BrandLogos } from './BrandLogos'
 import { Button } from './ui'
 
 export interface EntitlementCardProps {
@@ -40,12 +39,6 @@ export interface EntitlementCardProps {
   face?: 'both' | 'front' | 'back'
 }
 
-function formatValidity(from?: string | null, to?: string | null): string {
-  const start = from?.trim() || '—'
-  const end = to?.trim() || '—'
-  return `${start} – ${end}`
-}
-
 function PhoneIcon() {
   return (
     <svg className="card-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -65,30 +58,6 @@ function WhatsAppIcon() {
         d="M12 2a9.9 9.9 0 0 0-8.5 15l-1.1 4 4.1-1.1A9.9 9.9 0 1 0 12 2zm0 1.8a8.1 8.1 0 0 1 6.9 12.2l.4.7-.5.3a8.1 8.1 0 0 1-11.9-6.9A8.1 8.1 0 0 1 12 3.8zm-3.3 2.7c.2 0 .4 0 .6.1.2.1.4.5.5.8l.7 1.7c.1.2 0 .5-.1.7l-.5.7c-.1.2-.1.4 0 .6.5.9 1.3 1.7 2.2 2.2.2.1.4.1.6 0l.7-.5c.2-.1.5-.2.7-.1l1.7.7c.3.1.7.3.8.5.1.2.1.4.1.6 0 .2 0 .4-.1.6-.3.7-1.1 1.2-1.9 1.2h-.2c-2.6-.2-5-1.5-6.7-3.6-1.5-1.8-2.2-4-2.2-6.3 0-.8.5-1.6 1.2-1.9.2-.1.4-.1.6-.1z"
       />
     </svg>
-  )
-}
-
-function HotlinePanel({
-  title,
-  phone,
-  whatsapp,
-}: {
-  title: string
-  phone: string
-  whatsapp: string
-}) {
-  return (
-    <div className="card-hotline-panel">
-      <div className="card-hotline-panel-title">{title || '—'}</div>
-      <div className="card-hotline-row">
-        <PhoneIcon />
-        <span dir="ltr">{phone || '—'}</span>
-      </div>
-      <div className="card-hotline-row">
-        <WhatsAppIcon />
-        <span dir="ltr">{whatsapp || '—'}</span>
-      </div>
-    </div>
   )
 }
 
@@ -117,17 +86,14 @@ export function QrCard(props: EntitlementCardProps) {
     }).then(setQrUrl)
   }, [qrPayload])
 
-  const titleAr = props.titleAr?.trim() || 'بطاقة أسرة مستفيدة'
-  const projectTitle = props.projectTitleAr?.trim() || 'المطبخ المجتمعي'
+  const titleAr = props.titleAr?.trim() || 'بطاقة استحقاق وجبة ساخنة - مجاناً'
+  const projectTitle = props.projectTitleAr?.trim() || 'مشروع المطبخ المجتمعي'
   const holder = props.holderName?.trim() || '—'
   const count =
     props.beneficiaryCount != null && props.beneficiaryCount > 0 ? String(props.beneficiaryCount) : '—'
   const district = (props.dpNameAr || props.dpNameEn || props.dpCode || '—').trim() || '—'
-  const validity = formatValidity(props.validFrom, props.validTo)
   const complaints = props.complaintsHeadingAr?.trim() || 'الشكاوى والمقترحات'
   const hotlineHeading = props.hotlineHeadingAr?.trim() || 'الخط الساخن'
-  const hdpTitle = props.hdpPanelTitleAr?.trim() || 'برنامج التنمية الإنسانية'
-  const partnerTitle = props.partnerPanelTitleAr?.trim() || ''
   const reassurance =
     props.reassuranceTextAr?.trim() ||
     'المساعدة مجانية بالكامل — لا تدفع لأي شخص. وجبة واحدة لكل أسرة في اليوم.'
@@ -137,59 +103,50 @@ export function QrCard(props: EntitlementCardProps) {
   const showBatch = props.showBatch !== false
   const serial = props.cardSerial?.trim() || ''
   const batch = props.printBatch?.trim() || ''
+  const phone = (props.hdpPhone || props.partnerPhone || '').trim()
+  const whatsapp = (props.hdpWhatsapp || props.partnerWhatsapp || '').trim()
 
   const front = (
     <article className="entitlement-face entitlement-front entitlement-card-mm" style={cardStyle}>
       <div className="card-teal-band" aria-hidden="true" />
-      <div className="card-front-body">
-        <div className="card-logo-row">
-          <BrandLogos
-            className="h-10 sm:h-11"
-            layout="spread"
-            showWfp={props.showWfpLogo !== false}
-            showHdp={props.showHdpLogo !== false}
-            wfpSrc={props.wfpLogoDataUrl}
-            hdpSrc={props.hdpLogoDataUrl}
-          />
+      <header className="ec-top">
+        <div className="ec-logo ec-logo-hdp">
+          {props.showHdpLogo !== false ? <img src={props.hdpLogoDataUrl || '/logos/hdp.png'} alt="HDP" /> : null}
         </div>
-
-        <div className="card-front-columns">
-          <div className="card-front-info">
-            <h2 className="card-main-title">{titleAr}</h2>
-            <p className="card-project-title">{projectTitle}</p>
-
-            <div className="card-fields">
-              <div className="card-field-row">
-                <span className="card-field-label">الاسم</span>
-                <span className="card-field-value">{holder}</span>
-              </div>
-              <div className="card-field-row">
-                <span className="card-field-label">العدد</span>
-                <span className="card-field-value" data-testid="card-members">
-                  {count}
-                </span>
-              </div>
-              <div className="card-field-row">
-                <span className="card-field-label">المديرية</span>
-                <span className="card-field-value">{district}</span>
-              </div>
-            </div>
-
-            <div className="card-dates" dir="ltr">
-              <span>{validity}</span>
-            </div>
+        <div className="ec-titles">
+          <h2 className="ec-title">{titleAr}</h2>
+          <p className="ec-subtitle">{projectTitle}</p>
+        </div>
+        <div className="ec-logo ec-logo-wfp">
+          {props.showWfpLogo !== false ? <img src={props.wfpLogoDataUrl || '/logos/wfp.png'} alt="WFP" /> : null}
+        </div>
+      </header>
+      <div className="ec-body">
+        <div className="ec-fields">
+          <div className="ec-row">
+            <span className="ec-label">الاسم</span>
+            <span className="ec-value" data-testid="card-family">{holder}</span>
           </div>
-
-          <div className="card-front-qr">
-            {qrUrl ? (
-              <img src={qrUrl} alt={`QR ${props.hhCode}`} className="card-qr-img" />
-            ) : (
-              <div className="card-qr-placeholder">QR…</div>
-            )}
-            <p className="card-hh-code" dir="ltr" data-testid="card-hh-code">
-              {props.hhCode}
-            </p>
+          <div className="ec-row">
+            <span className="ec-label">العدد</span>
+            <span className="ec-value" data-testid="card-members">{count}</span>
           </div>
+          <div className="ec-row">
+            <span className="ec-label">المديرية</span>
+            <span className="ec-value">{district}</span>
+          </div>
+          <div className="ec-dates">
+            <div><span>تاريخ الإصدار</span> <b dir="ltr">{props.validFrom?.trim() || '—'}</b></div>
+            <div><span>صالحة حتى</span> <b dir="ltr">{props.validTo?.trim() || '—'}</b></div>
+          </div>
+        </div>
+        <div className="ec-qr">
+          {qrUrl ? (
+            <img src={qrUrl} alt={`QR ${props.hhCode}`} className="card-qr-img" />
+          ) : (
+            <div className="card-qr-placeholder">QR…</div>
+          )}
+          <p className="ec-hh" dir="ltr" data-testid="card-hh-code">{props.hhCode}</p>
         </div>
       </div>
     </article>
@@ -198,47 +155,35 @@ export function QrCard(props: EntitlementCardProps) {
   const back = (
     <article className="entitlement-face entitlement-back entitlement-card-mm" style={cardStyle}>
       <div className="card-teal-band" aria-hidden="true" />
-      <div className="card-back-body">
-        <header className="card-back-header">
-          <h2 className="card-back-title" data-testid="card-complaints-heading">
-            {complaints}
-          </h2>
-          <p className="card-hotline-label" data-testid="card-hotline-heading">
-            {hotlineHeading}
-          </p>
-        </header>
-
-        <div className="card-hotline-grid">
-          <HotlinePanel title={hdpTitle} phone={props.hdpPhone || ''} whatsapp={props.hdpWhatsapp || ''} />
-          <HotlinePanel title={partnerTitle} phone={props.partnerPhone || ''} whatsapp={props.partnerWhatsapp || ''} />
+      <header className="ec-back-head">
+        <span data-testid="card-complaints-heading">{complaints}</span>
+        <span className="ec-dot">•</span>
+        <span data-testid="card-hotline-heading">{hotlineHeading}</span>
+      </header>
+      <div className="ec-panels">
+        <div className="ec-panel">
+          <div className="ec-panel-title"><PhoneIcon /> {hotlineHeading}</div>
+          <div className="ec-panel-num" dir="ltr">{phone || '—'}</div>
         </div>
-
-        <p className="card-reassurance">{reassurance}</p>
-        <p className="card-personal-notice">{notice}</p>
-
-        {(showSerial && serial) || (showBatch && batch) ? (
-          <dl className="card-meta" dir="ltr">
-            {showSerial && serial ? (
-              <div>
-                <dt>{t('cardSerial')}</dt>
-                <dd>{serial}</dd>
-              </div>
-            ) : null}
-            {showBatch && batch ? (
-              <div>
-                <dt>{t('printBatch')}</dt>
-                <dd>{batch}</dd>
-              </div>
-            ) : null}
-          </dl>
-        ) : null}
+        <div className="ec-panel">
+          <div className="ec-panel-title"><WhatsAppIcon /> واتساب</div>
+          <div className="ec-panel-num" dir="ltr">{whatsapp || '—'}</div>
+        </div>
       </div>
+      <p className="ec-reassure">{reassurance}</p>
+      <p className="ec-notice">{notice}</p>
+      {(showSerial && serial) || (showBatch && batch) ? (
+        <div className="ec-meta" dir="ltr">
+          {showSerial && serial ? <span>{t('cardSerial')}: {serial}</span> : null}
+          {showBatch && batch ? <span>{t('printBatch')}: {batch}</span> : null}
+        </div>
+      ) : null}
     </article>
   )
 
   const bulk = props.hidePrintButton || face !== 'both'
   return (
-    <div className={`entitlement-print mx-auto w-full text-ink${bulk ? ' bulk-card' : ''}`} dir="rtl">
+    <div className={`entitlement-print text-ink${bulk ? ' bulk-card' : ''}`} dir="rtl">
       {face === 'back' ? null : front}
       {face === 'front' ? null : back}
       {!props.hidePrintButton && face === 'both' ? (

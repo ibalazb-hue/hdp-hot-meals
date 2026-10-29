@@ -148,6 +148,11 @@ function resultKey(result: ScanResult): string {
   return 'unknown'
 }
 
+/** Old built-in card titles are upgraded to the current default. */
+function legacyTitle(value: string, legacy: string): string {
+  return value === legacy ? '' : value
+}
+
 function mapHousehold(row: Row) {
   return {
     hhCode: String(row.hh_code),
@@ -155,6 +160,8 @@ function mapHousehold(row: Row) {
     status: row.status === 'inactive' ? 'inactive' : 'active',
     activeCardCode: row.active_card_code == null ? null : String(row.active_card_code),
     beneficiaryCount: row.beneficiary_count == null ? 0 : Number(row.beneficiary_count),
+    label: row.label == null ? null : String(row.label),
+    familyName: row.family_name == null ? null : String(row.family_name),
   } as const
 }
 
@@ -501,7 +508,7 @@ export async function syncBundle(db: Database, actor: Actor) {
     scopeCodes,
   )
   const households = await db.query(
-    `SELECT hh_code, dp_code, status, active_card_code, beneficiary_count FROM households WHERE dp_code IN (${dpsIn.sql}) ORDER BY hh_code`,
+    `SELECT hh_code, dp_code, status, active_card_code, beneficiary_count, label, family_name FROM households WHERE dp_code IN (${dpsIn.sql}) ORDER BY hh_code`,
     scopeCodes,
   )
   const voidedCards = await db.query(
@@ -650,8 +657,8 @@ export function defaultCardTemplate(): CardTemplate {
   const hdpHotline = process.env.HDP_HOTLINE?.trim() || ''
   return {
     titleEn: 'Beneficiary household card',
-    titleAr: 'بطاقة أسرة مستفيدة',
-    projectTitleAr: 'المطبخ المجتمعي',
+    titleAr: 'بطاقة استحقاق وجبة ساخنة - مجاناً',
+    projectTitleAr: 'مشروع المطبخ المجتمعي',
     primaryColor: '#0B5C6B',
     showWfpLogo: true,
     showHdpLogo: true,
@@ -675,8 +682,8 @@ export function defaultCardTemplate(): CardTemplate {
     validFrom: process.env.CARD_VALID_FROM?.trim() || '',
     validTo: process.env.CARD_VALID_TO?.trim() || '',
     printBatch: '',
-    showSerial: false,
-    showBatch: false,
+    showSerial: true,
+    showBatch: true,
     serialPrefix: '',
   }
 }
@@ -708,8 +715,8 @@ export function normalizeCardTemplate(input: Partial<CardTemplate> | null | unde
   const hdpPhoneRaw = (input.hdpPhone != null ? String(input.hdpPhone) : base.hdpPhone).trim().slice(0, 80)
   return {
     titleEn: (input.titleEn != null ? String(input.titleEn) : base.titleEn).trim().slice(0, 120) || base.titleEn,
-    titleAr: (input.titleAr != null ? String(input.titleAr) : base.titleAr).trim().slice(0, 120) || base.titleAr,
-    projectTitleAr: (input.projectTitleAr != null ? String(input.projectTitleAr) : base.projectTitleAr).trim().slice(0, 120) || base.projectTitleAr,
+    titleAr: legacyTitle((input.titleAr != null ? String(input.titleAr) : base.titleAr).trim().slice(0, 120), 'بطاقة أسرة مستفيدة') || base.titleAr,
+    projectTitleAr: legacyTitle((input.projectTitleAr != null ? String(input.projectTitleAr) : base.projectTitleAr).trim().slice(0, 120), 'المطبخ المجتمعي') || base.projectTitleAr,
     primaryColor: normalizePrimaryColor(input.primaryColor != null ? String(input.primaryColor) : base.primaryColor),
     showWfpLogo: input.showWfpLogo !== false,
     showHdpLogo: input.showHdpLogo !== false,
@@ -841,7 +848,7 @@ async function dpNames(db: Queryable, dpCode: string): Promise<{ nameEn: string;
 export async function createHousehold(
   db: Database,
   actor: Actor,
-  input: { dpCode: string; beneficiaryCount: number; label?: string | null },
+  input: { dpCode: string; beneficiaryCount: number; label?: string | null; familyName?: string | null },
 ) {
   requireWriter(actor)
   const dpCode = input.dpCode.toUpperCase()
@@ -864,10 +871,11 @@ export async function createHousehold(
       cardCode = newCardCode()
     }
     const label = cleanLabel(input.label)
+    const familyName = cleanLabel(input.familyName)
     await tx.query(
-      `INSERT INTO households (hh_code, dp_code, beneficiary_count, label, active_card_code, registered_by)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [hhCode, dpCode, input.beneficiaryCount, label, cardCode, actor.id],
+      `INSERT INTO households (hh_code, dp_code, beneficiary_count, label, family_name, active_card_code, registered_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [hhCode, dpCode, input.beneficiaryCount, label, familyName, cardCode, actor.id],
     )
     await tx.query(
       `INSERT INTO card_issuance (id, hh_code, card_code, action, reason, operator_id)
@@ -883,7 +891,7 @@ export async function createHousehold(
       entityType: 'household',
       entityId: hhCode,
       summary: `Registered household ${hhCode} at ${dpCode}`,
-      detail: { dpCode, beneficiaryCount: input.beneficiaryCount, label, cardCode },
+      detail: { dpCode, beneficiaryCount: input.beneficiaryCount, label, familyName, cardCode },
     })
     return {
       hhCode,
@@ -892,6 +900,7 @@ export async function createHousehold(
       payload: cardPayload(cardCode, hhCode),
       beneficiaryCount: input.beneficiaryCount,
       label,
+      familyName,
       dpNameEn: names.nameEn,
       dpNameAr: names.nameAr,
       holderName: label,
@@ -906,14 +915,15 @@ export async function updateHousehold(
   db: Database,
   actor: Actor,
   hhCode: string,
-  input: { dpCode?: string; label?: string | null; beneficiaryCount?: number },
+  input: { dpCode?: string; label?: string | null; familyName?: string | null; beneficiaryCount?: number },
 ) {
   requireWriter(actor)
   const code = normalizeHhCode(hhCode)
   const hasDp = input.dpCode !== undefined
   const hasLabel = input.label !== undefined
+  const hasFamily = input.familyName !== undefined
   const hasCount = input.beneficiaryCount !== undefined
-  if (!hasDp && !hasLabel && !hasCount) throw new HttpError(400, 'invalid_body')
+  if (!hasDp && !hasLabel && !hasFamily && !hasCount) throw new HttpError(400, 'invalid_body')
   if (hasCount) {
     if (!Number.isInteger(input.beneficiaryCount) || (input.beneficiaryCount as number) < 1 || (input.beneficiaryCount as number) > 30) {
       throw new HttpError(400, 'invalid_count')
@@ -921,7 +931,7 @@ export async function updateHousehold(
   }
   return db.transaction(async (tx) => {
     const rows = await tx.query(
-      `SELECT dp_code, label, beneficiary_count, status FROM households WHERE hh_code = $1 FOR UPDATE`,
+      `SELECT dp_code, label, family_name, beneficiary_count, status FROM households WHERE hh_code = $1 FOR UPDATE`,
       [code],
     )
     if (!rows[0]) throw new HttpError(404, 'unknown')
@@ -934,12 +944,13 @@ export async function updateHousehold(
       if (nextDp !== currentDp) await assertActiveDp(tx, nextDp)
     }
     const nextLabel = hasLabel ? cleanLabel(input.label) : rows[0].label == null ? null : String(rows[0].label)
+    const nextFamily = hasFamily ? cleanLabel(input.familyName) : rows[0].family_name == null ? null : String(rows[0].family_name)
     const nextCount = hasCount ? Number(input.beneficiaryCount) : Number(rows[0].beneficiary_count)
     await tx.query(
       `UPDATE households
-       SET dp_code = $2, label = $3, beneficiary_count = $4, updated_at = now()
+       SET dp_code = $2, label = $3, beneficiary_count = $4, family_name = $5, updated_at = now()
        WHERE hh_code = $1`,
-      [code, nextDp, nextLabel, nextCount],
+      [code, nextDp, nextLabel, nextCount, nextFamily],
     )
     await recordAudit(tx, {
       actorId: actor.id,
@@ -951,6 +962,8 @@ export async function updateHousehold(
         previousDpCode: currentDp,
         dpCode: nextDp,
         label: nextLabel,
+        previousFamilyName: rows[0].family_name == null ? null : String(rows[0].family_name),
+        familyName: nextFamily,
         beneficiaryCount: nextCount,
       },
     })
@@ -958,6 +971,7 @@ export async function updateHousehold(
       hhCode: code,
       dpCode: nextDp,
       label: nextLabel,
+      familyName: nextFamily,
       beneficiaryCount: nextCount,
       status: String(rows[0].status),
       previousDpCode: currentDp,
@@ -980,10 +994,10 @@ export async function listHouseholds(db: Database, actor: Actor, query: { q?: st
     const hhParam = params.length
     params.push(`%${raw.replace(/[%_]/g, '')}%`)
     const labelParam = params.length
-    prefix = ` AND (hh_code LIKE $${hhParam} OR COALESCE(label, '') ILIKE $${labelParam})`
+    prefix = ` AND (hh_code LIKE $${hhParam} OR COALESCE(label, '') ILIKE $${labelParam} OR COALESCE(family_name, '') ILIKE $${labelParam})`
   }
   const rows = await db.query(
-    `SELECT hh_code, dp_code, beneficiary_count, label, status, active_card_code
+    `SELECT hh_code, dp_code, beneficiary_count, label, family_name, status, active_card_code
      FROM households WHERE dp_code IN (${clause.sql})${prefix}
      ORDER BY hh_code LIMIT 50`,
     params,
@@ -993,6 +1007,7 @@ export async function listHouseholds(db: Database, actor: Actor, query: { q?: st
     dpCode: String(row.dp_code),
     beneficiaryCount: Number(row.beneficiary_count),
     label: row.label == null ? null : String(row.label),
+    familyName: row.family_name == null ? null : String(row.family_name),
     status: String(row.status),
     activeCardCode: row.active_card_code == null ? null : String(row.active_card_code),
   }))
@@ -1018,12 +1033,12 @@ export async function listPrintableHouseholds(
     const hhParam = params.length
     params.push(`%${raw.replace(/[%_]/g, '')}%`)
     const labelParam = params.length
-    prefix = ` AND (h.hh_code LIKE $${hhParam} OR COALESCE(h.label, '') ILIKE $${labelParam})`
+    prefix = ` AND (h.hh_code LIKE $${hhParam} OR COALESCE(h.label, '') ILIKE $${labelParam} OR COALESCE(h.family_name, '') ILIKE $${labelParam})`
   }
   const limit = Math.min(Math.max(Number(query.limit) || 500, 1), 2000)
   params.push(limit)
   const rows = await db.query(
-    `SELECT h.hh_code, h.dp_code, h.beneficiary_count, h.label, h.status, h.active_card_code, h.created_at,
+    `SELECT h.hh_code, h.dp_code, h.beneficiary_count, h.label, h.family_name, h.status, h.active_card_code, h.created_at,
             dp.name_en, dp.name_ar,
             (
               SELECT ci.created_at FROM card_issuance ci
@@ -1048,6 +1063,7 @@ export async function listPrintableHouseholds(
       dpCode: String(row.dp_code),
       beneficiaryCount: Number(row.beneficiary_count),
       label: row.label == null ? null : String(row.label),
+      familyName: row.family_name == null ? null : String(row.family_name),
       status: String(row.status),
       activeCardCode: activeCard,
       dpNameEn: row.name_en == null ? String(row.dp_code) : String(row.name_en),
@@ -1081,6 +1097,7 @@ export async function getHousehold(db: Database, actor: Actor, hhCode: string) {
     dpCode,
     beneficiaryCount: Number(rows[0].beneficiary_count),
     label: rows[0].label == null ? null : String(rows[0].label),
+    familyName: rows[0].family_name == null ? null : String(rows[0].family_name),
     status: String(rows[0].status),
     activeCardCode: activeCard,
     payload: activeCard ? cardPayload(activeCard, code) : null,

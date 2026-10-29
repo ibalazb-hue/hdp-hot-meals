@@ -21,6 +21,8 @@ export interface LocalHousehold {
   status: 'active' | 'inactive'
   activeCardCode: string | null
   beneficiaryCount: number
+  label?: string | null
+  familyName?: string | null
 }
 
 export interface LocalScan {

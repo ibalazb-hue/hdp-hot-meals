@@ -85,6 +85,28 @@ describe('meal scans', () => {
     expect(served.json.scan?.result).toBe('Served')
   })
 
+  it('stores, edits and searches the family name', async () => {
+    const meal = await login('meal.taiz')
+    const created = await app.request('/api/households', {
+      method: 'POST',
+      headers: auth(meal.token),
+      body: JSON.stringify({ dpCode: 'MDF01', beneficiaryCount: 3, familyName: 'آل الحكيمي' }),
+    })
+    expect(created.status).toBe(201)
+    const hh = (await created.json()) as { hhCode: string; familyName: string }
+    expect(hh.familyName).toBe('آل الحكيمي')
+    const patched = await app.request(`/api/households/${hh.hhCode}`, {
+      method: 'PATCH',
+      headers: auth(meal.token),
+      body: JSON.stringify({ familyName: 'أسرة الشرعبي' }),
+    })
+    expect(patched.status).toBe(200)
+    const detail = (await (await app.request(`/api/households/${hh.hhCode}`, { headers: auth(meal.token) })).json()) as { familyName: string }
+    expect(detail.familyName).toBe('أسرة الشرعبي')
+    const list = (await (await app.request(`/api/households?q=${encodeURIComponent('الشرعبي')}`, { headers: auth(meal.token) })).json()) as Array<{ hhCode: string }>
+    expect(list.some((row) => row.hhCode === hh.hhCode)).toBe(true)
+  })
+
   it('serves once per household per Aden day and blocks the second scan', async () => {
     const focal = await login('focal.mudhaffar')
     const first = await postScan(focal.token, scan(focal.user.id))

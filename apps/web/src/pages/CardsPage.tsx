@@ -12,6 +12,7 @@ interface Household {
   dpCode: string
   beneficiaryCount: number
   label: string | null
+  familyName?: string | null
   status: string
   activeCardCode: string | null
   payload?: string | null
@@ -52,7 +53,7 @@ interface DpOption {
 function cardProps(hh: Household) {
   return {
     hhCode: hh.hhCode,
-    holderName: hh.holderName ?? hh.label,
+    holderName: hh.familyName || hh.holderName || hh.label,
     dpCode: hh.dpCode,
     dpNameEn: hh.dpNameEn,
     dpNameAr: hh.dpNameAr,
@@ -91,6 +92,7 @@ export function CardsPage() {
   const [dps, setDps] = useState<DpOption[]>([])
   const [editDp, setEditDp] = useState('')
   const [editLabel, setEditLabel] = useState('')
+  const [editFamily, setEditFamily] = useState('')
   const [editCount, setEditCount] = useState('1')
   const [saving, setSaving] = useState(false)
   const [bulkLoading, setBulkLoading] = useState(false)
@@ -121,6 +123,7 @@ export function CardsPage() {
     setSelected(hh)
     setEditDp(hh.dpCode)
     setEditLabel(hh.label ?? '')
+    setEditFamily(hh.familyName ?? '')
     setEditCount(String(hh.beneficiaryCount || 1))
     setMessage('')
     setBulkActive(false)
@@ -141,6 +144,7 @@ export function CardsPage() {
         body: JSON.stringify({
           dpCode: editDp,
           label: editLabel.trim() ? editLabel.trim() : null,
+          familyName: editFamily.trim() ? editFamily.trim() : null,
           beneficiaryCount: count,
         }),
       })
@@ -212,6 +216,7 @@ export function CardsPage() {
     selected &&
     (editDp !== selected.dpCode ||
       (editLabel.trim() || '') !== (selected.label ?? '') ||
+      (editFamily.trim() || '') !== (selected.familyName ?? '') ||
       Number(editCount) !== selected.beneficiaryCount)
 
   return (
@@ -257,7 +262,7 @@ export function CardsPage() {
                   <span className="font-mono font-semibold">{row.hhCode}</span>
                   <span className="mt-0.5 block text-xs text-muted">
                     {row.dpCode}
-                    {row.label ? ` · ${row.label}` : ''} · {t('beneficiaryCount')}: {row.beneficiaryCount}
+                    {row.familyName ? ` · ${row.familyName}` : ''}{row.label ? ` · ${row.label}` : ''} · {t('beneficiaryCount')}: {row.beneficiaryCount}
                   </span>
                 </span>
                 <span className={`text-xs font-bold ${row.activeCardCode ? 'text-served' : 'text-blocked'}`}>
@@ -284,6 +289,9 @@ export function CardsPage() {
                 ))}
                 {!dps.some((dp) => dp.code === editDp) && editDp ? <option value={editDp}>{editDp}</option> : null}
               </SelectInput>
+            </Field>
+            <Field label={t('familyName')}>
+              <TextInput data-testid="hh-family" value={editFamily} maxLength={80} onChange={(event) => setEditFamily(event.target.value)} />
             </Field>
             <Field label={t('householdName')}>
               <TextInput

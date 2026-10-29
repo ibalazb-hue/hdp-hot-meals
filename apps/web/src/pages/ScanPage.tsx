@@ -33,6 +33,7 @@ export function ScanPage() {
   const [result, setResult] = useState<LocalScan | null>(null)
   const [assigned, setAssigned] = useState('')
   const [members, setMembers] = useState<number | null>(null)
+  const [family, setFamily] = useState('')
   const [error, setError] = useState('')
   const [cameraError, setCameraError] = useState(false)
   const [reason, setReason] = useState('')
@@ -68,9 +69,11 @@ export function ScanPage() {
         const household = await db.households.get(scan.hhCode)
         const point = household ? await db.dps.get(household.dpCode) : null
         setAssigned(point ? `${point.nameEn} / ${point.nameAr}` : household?.dpCode ?? '')
+        setFamily(household?.familyName || household?.label || '')
         setMembers(household?.beneficiaryCount && household.beneficiaryCount > 0 ? household.beneficiaryCount : null)
       } else {
         setAssigned('')
+        setFamily('')
         setMembers(null)
       }
     } catch (err) {
@@ -151,6 +154,11 @@ export function ScanPage() {
           <p className="mt-2 text-end font-mono text-2xl" dir="ltr">
             {result.hhCode ?? result.cardCode}
           </p>
+          {family ? (
+            <p className="text-lg font-semibold" data-testid="scan-family">
+              {t('familyName')}: {family}
+            </p>
+          ) : null}
           {members != null ? (
             <p className="text-lg font-semibold" data-testid="scan-members">
               {t('beneficiaryCount')}: {members}

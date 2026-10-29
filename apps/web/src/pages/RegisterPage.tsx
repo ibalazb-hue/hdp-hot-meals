@@ -13,6 +13,7 @@ interface Issued {
   payload: string
   beneficiaryCount: number
   label?: string | null
+  familyName?: string | null
   dpNameEn?: string | null
   dpNameAr?: string | null
   holderName?: string | null
@@ -50,6 +51,7 @@ export function RegisterPage() {
   const [dp, setDp] = useState(session?.user.dpCodes[0] ?? '')
   const [count, setCount] = useState('5')
   const [label, setLabel] = useState('')
+  const [familyName, setFamilyName] = useState('')
   const [issued, setIssued] = useState<Issued | null>(null)
   const [error, setError] = useState('')
 
@@ -68,7 +70,7 @@ export function RegisterPage() {
     try {
       const body = await apiJson<Issued>('/api/households', {
         method: 'POST',
-        body: JSON.stringify({ dpCode: dp, beneficiaryCount: Number(count), label }),
+        body: JSON.stringify({ dpCode: dp, beneficiaryCount: Number(count), label, familyName: familyName.trim() || null }),
       })
       setIssued(body)
     } catch (err) {
@@ -95,6 +97,9 @@ export function RegisterPage() {
           <Field label={t('beneficiaryCount')}>
             <TextInput data-testid="register-count" inputMode="numeric" value={count} onChange={(event) => setCount(event.target.value)} />
           </Field>
+          <Field label={t('familyName')}>
+            <TextInput data-testid="register-family" value={familyName} onChange={(event) => setFamilyName(event.target.value)} maxLength={80} />
+          </Field>
           <Field label={t('label')}>
             <TextInput value={label} onChange={(event) => setLabel(event.target.value)} maxLength={80} />
           </Field>
@@ -110,7 +115,7 @@ export function RegisterPage() {
           <div className="mt-3">
             <QrCard
               hhCode={issued.hhCode}
-              holderName={issued.holderName ?? issued.label ?? label}
+              holderName={issued.familyName || issued.holderName || issued.label || familyName || label}
               dpCode={issued.dpCode}
               dpNameEn={issued.dpNameEn ?? point?.nameEn}
               dpNameAr={issued.dpNameAr ?? point?.nameAr}

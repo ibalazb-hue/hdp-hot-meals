@@ -4,6 +4,8 @@ import { registerSW } from 'virtual:pwa-register'
 import { App } from './App'
 import { AuthProvider } from './auth'
 import { LocaleProvider } from './i18n'
+import '@fontsource/cairo/400.css'
+import '@fontsource/cairo/700.css'
 import './index.css'
 
 registerSW({

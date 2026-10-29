@@ -2,14 +2,15 @@ import { jsPDF } from 'jspdf'
 import { toPng } from 'html-to-image'
 
 /** A4 portrait layout: 3 rows; each row = front (left) | back (right). */
+/** Faces are true ID-1 size (85.6 × 54 mm). Row pitch spreads 3 rows across A4. */
 export const PDF_LAYOUT = {
   pageW: 210,
   pageH: 297,
-  margin: 8,
-  gutter: 6,
-  rowGap: 6,
-  faceW: 94,
-  faceH: 88,
+  margin: 33.75,
+  gutter: 10,
+  rowGap: 33.75,
+  faceW: 85.6,
+  faceH: 54,
 } as const
 
 async function waitForImages(root: HTMLElement) {
@@ -35,7 +36,7 @@ export async function buildCardsPdf(
   filename: string,
   onProgress?: (done: number, total: number) => void,
 ): Promise<void> {
-  const { pageW, margin, gutter, rowGap, faceW, faceH } = PDF_LAYOUT
+  const { pageW, pageH, margin, gutter, rowGap, faceW, faceH } = PDF_LAYOUT
   const rows = Array.from(root.querySelectorAll<HTMLElement>('[data-pdf-row]'))
   // Wait until QR codes are generated (img present instead of placeholder)
   for (let i = 0; i < 100; i += 1) {
@@ -46,6 +47,7 @@ export async function buildCardsPdf(
   if (document.fonts?.ready) await document.fonts.ready
 
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true })
+  void pageH
   const totalW = faceW * 2 + gutter
   const left = (pageW - totalW) / 2
 
@@ -55,15 +57,28 @@ export async function buildCardsPdf(
     const y = margin + slot * (faceH + rowGap)
     const front = rows[i].querySelector<HTMLElement>('.entitlement-front')
     const back = rows[i].querySelector<HTMLElement>('.entitlement-back')
-    const opts = { pixelRatio: 3, backgroundColor: '#ffffff', cacheBust: false }
+    const opts = { pixelRatio: 6, backgroundColor: '#ffffff', cacheBust: false }
     if (front) pdf.addImage(await toPng(front, opts), 'PNG', left, y, faceW, faceH, undefined, 'FAST')
     if (back) pdf.addImage(await toPng(back, opts), 'PNG', left + faceW + gutter, y, faceW, faceH, undefined, 'FAST')
-    // light cut guide
-    pdf.setDrawColor(200)
+    // light cut guides (corner ticks) around each face
+    pdf.setDrawColor(170)
     pdf.setLineWidth(0.1)
-    pdf.rect(left, y, faceW, faceH)
-    pdf.rect(left + faceW + gutter, y, faceW, faceH)
+    for (const x of [left, left + faceW + gutter]) cutMarks(pdf, x, y, faceW, faceH)
     onProgress?.(i + 1, rows.length)
   }
   pdf.save(filename)
+}
+
+function cutMarks(pdf: jsPDF, x: number, y: number, w: number, h: number) {
+  const k = 3
+  const o = 1
+  for (const [cx, cy, dx, dy] of [
+    [x, y, -1, -1],
+    [x + w, y, 1, -1],
+    [x, y + h, -1, 1],
+    [x + w, y + h, 1, 1],
+  ] as const) {
+    pdf.line(cx + dx * o, cy, cx + dx * (o + k), cy)
+    pdf.line(cx, cy + dy * o, cx, cy + dy * (o + k))
+  }
 }
