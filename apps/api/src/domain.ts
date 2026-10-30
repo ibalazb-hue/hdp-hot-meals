@@ -18,6 +18,7 @@ import {
   type ScanResult,
 } from '@hdp/rules'
 import { asBool, asText, type Database, type Queryable, type Row } from './db.js'
+import { PROFILE_FIELDS, cleanProfile, hasProfileInput, profileFromRow } from './profile.js'
 
 export class HttpError extends Error {
   constructor(
@@ -510,7 +511,7 @@ export async function syncBundle(db: Database, actor: Actor) {
     scopeCodes,
   )
   const households = await db.query(
-    `SELECT hh_code, dp_code, status, active_card_code, beneficiary_count, label, family_name FROM households WHERE dp_code IN (${dpsIn.sql}) ORDER BY hh_code`,
+    `SELECT * FROM households WHERE dp_code IN (${dpsIn.sql}) ORDER BY hh_code`,
     scopeCodes,
   )
   const voidedCards = await db.query(
@@ -557,7 +558,9 @@ export async function syncBundle(db: Database, actor: Actor) {
       gpsRadiusM: Number(row.gps_radius_m) || 150,
       gpsCheckActive: asBool(row.gps_check_active),
     })),
-    households: households.map((row) => mapHousehold(row)),
+    households: households.map((row) =>
+      actor.role === 'meal' || actor.role === 'admin' ? { ...mapHousehold(row), ...profileFromRow(row) } : mapHousehold(row),
+    ),
     voidedCards: voidedCards.map((row) => ({ cardCode: String(row.card_code), hhCode: String(row.hh_code) })),
     servedToday: servedToday.map((row) => ({
       clientScanId: String(row.id),
@@ -850,7 +853,7 @@ async function dpNames(db: Queryable, dpCode: string): Promise<{ nameEn: string;
 export async function createHousehold(
   db: Database,
   actor: Actor,
-  input: { dpCode: string; beneficiaryCount: number; label?: string | null; familyName?: string | null },
+  input: { dpCode: string; beneficiaryCount: number; label?: string | null; familyName?: string | null } & Record<string, unknown>,
 ) {
   requireWriter(actor)
   const dpCode = input.dpCode.toUpperCase()
@@ -874,11 +877,14 @@ export async function createHousehold(
     }
     const label = cleanLabel(input.label)
     const familyName = cleanLabel(input.familyName)
+    const profile = cleanProfile(input)
+    input = { ...input, beneficiaryCount: totalFromProfile(profile, input.beneficiaryCount) }
     await tx.query(
       `INSERT INTO households (hh_code, dp_code, beneficiary_count, label, family_name, active_card_code, registered_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [hhCode, dpCode, input.beneficiaryCount, label, familyName, cardCode, actor.id],
     )
+    await writeProfile(tx, hhCode, profile)
     await tx.query(
       `INSERT INTO card_issuance (id, hh_code, card_code, action, reason, operator_id)
        VALUES ($1, $2, $3, 'issue', 'Initial issue', $4)`,
@@ -893,7 +899,7 @@ export async function createHousehold(
       entityType: 'household',
       entityId: hhCode,
       summary: `Registered household ${hhCode} at ${dpCode}`,
-      detail: { dpCode, beneficiaryCount: input.beneficiaryCount, label, familyName, cardCode },
+      detail: { dpCode, beneficiaryCount: input.beneficiaryCount, label, familyName, cardCode, profile: Object.fromEntries(profile.map((p) => [p.key, p.value])) },
     })
     return {
       hhCode,
@@ -903,6 +909,7 @@ export async function createHousehold(
       beneficiaryCount: input.beneficiaryCount,
       label,
       familyName,
+      ...Object.fromEntries(profile.map((p) => [p.key, p.value])),
       dpNameEn: names.nameEn,
       dpNameAr: names.nameAr,
       holderName: label,
@@ -917,7 +924,7 @@ export async function updateHousehold(
   db: Database,
   actor: Actor,
   hhCode: string,
-  input: { dpCode?: string; label?: string | null; familyName?: string | null; beneficiaryCount?: number },
+  input: { dpCode?: string; label?: string | null; familyName?: string | null; beneficiaryCount?: number } & Record<string, unknown>,
 ) {
   requireWriter(actor)
   const code = normalizeHhCode(hhCode)
@@ -925,7 +932,8 @@ export async function updateHousehold(
   const hasLabel = input.label !== undefined
   const hasFamily = input.familyName !== undefined
   const hasCount = input.beneficiaryCount !== undefined
-  if (!hasDp && !hasLabel && !hasFamily && !hasCount) throw new HttpError(400, 'invalid_body')
+  const hasProfile = hasProfileInput(input)
+  if (!hasDp && !hasLabel && !hasFamily && !hasCount && !hasProfile) throw new HttpError(400, 'invalid_body')
   if (hasCount) {
     if (!Number.isInteger(input.beneficiaryCount) || (input.beneficiaryCount as number) < 1 || (input.beneficiaryCount as number) > 30) {
       throw new HttpError(400, 'invalid_count')
@@ -933,7 +941,7 @@ export async function updateHousehold(
   }
   return db.transaction(async (tx) => {
     const rows = await tx.query(
-      `SELECT dp_code, label, family_name, beneficiary_count, status FROM households WHERE hh_code = $1 FOR UPDATE`,
+      `SELECT * FROM households WHERE hh_code = $1 FOR UPDATE`,
       [code],
     )
     if (!rows[0]) throw new HttpError(404, 'unknown')
@@ -947,12 +955,23 @@ export async function updateHousehold(
     }
     const nextLabel = hasLabel ? cleanLabel(input.label) : rows[0].label == null ? null : String(rows[0].label)
     const nextFamily = hasFamily ? cleanLabel(input.familyName) : rows[0].family_name == null ? null : String(rows[0].family_name)
-    const nextCount = hasCount ? Number(input.beneficiaryCount) : Number(rows[0].beneficiary_count)
+    const profile = cleanProfile(input)
+    const before = profileFromRow(rows[0])
+    const merged = PROFILE_FIELDS.map((f) => {
+      const p = profile.find((x) => x.key === f.key)
+      return { col: f.col, key: f.key, value: p ? p.value : before[f.key] ?? null }
+    })
+    let nextCount = hasCount ? Number(input.beneficiaryCount) : Number(rows[0].beneficiary_count)
+    nextCount = totalFromProfile(merged, nextCount)
     await tx.query(
       `UPDATE households
        SET dp_code = $2, label = $3, beneficiary_count = $4, family_name = $5, updated_at = now()
        WHERE hh_code = $1`,
       [code, nextDp, nextLabel, nextCount, nextFamily],
+    )
+    await writeProfile(tx, code, profile)
+    const profileChanges = Object.fromEntries(
+      profile.filter((p) => (before[p.key as keyof typeof before] ?? null) !== p.value).map((p) => [p.key, { from: before[p.key as keyof typeof before] ?? null, to: p.value }]),
     )
     await recordAudit(tx, {
       actorId: actor.id,
@@ -967,6 +986,7 @@ export async function updateHousehold(
         previousFamilyName: rows[0].family_name == null ? null : String(rows[0].family_name),
         familyName: nextFamily,
         beneficiaryCount: nextCount,
+        profileChanges,
       },
     })
     return {
@@ -974,6 +994,7 @@ export async function updateHousehold(
       dpCode: nextDp,
       label: nextLabel,
       familyName: nextFamily,
+      ...Object.fromEntries(merged.map((p) => [p.key, p.value])),
       beneficiaryCount: nextCount,
       status: String(rows[0].status),
       previousDpCode: currentDp,
@@ -999,7 +1020,7 @@ export async function listHouseholds(db: Database, actor: Actor, query: { q?: st
     prefix = ` AND (hh_code LIKE $${hhParam} OR COALESCE(label, '') ILIKE $${labelParam} OR COALESCE(family_name, '') ILIKE $${labelParam})`
   }
   const rows = await db.query(
-    `SELECT hh_code, dp_code, beneficiary_count, label, family_name, status, active_card_code
+    `SELECT *
      FROM households WHERE dp_code IN (${clause.sql})${prefix}
      ORDER BY hh_code LIMIT 50`,
     params,
@@ -1010,6 +1031,7 @@ export async function listHouseholds(db: Database, actor: Actor, query: { q?: st
     beneficiaryCount: Number(row.beneficiary_count),
     label: row.label == null ? null : String(row.label),
     familyName: row.family_name == null ? null : String(row.family_name),
+    ...profileFromRow(row),
     status: String(row.status),
     activeCardCode: row.active_card_code == null ? null : String(row.active_card_code),
   }))
@@ -1106,6 +1128,7 @@ export async function getHousehold(db: Database, actor: Actor, hhCode: string) {
     dpNameEn: names.nameEn,
     dpNameAr: names.nameAr,
     holderName: rows[0].label == null ? null : String(rows[0].label),
+    ...profileFromRow(rows[0]),
     ...cardPrintFields(template, activeCard, issuedAt, createdDay),
     history: history.map((row) => ({
       cardCode: String(row.card_code),
@@ -2177,4 +2200,70 @@ export async function reports(db: Database, actor: Actor, filters: ReportFilters
     })),
     blockReasons: blockReasons.map((r) => ({ reason: String(r.reason), count: num(r.n) })),
   }
+}
+
+function totalFromProfile(profile: Array<{ key: string; value: unknown }>, fallback: number): number {
+  const m = profile.find((p) => p.key === 'males')?.value
+  const f = profile.find((p) => p.key === 'females')?.value
+  if (typeof m === 'number' && typeof f === 'number' && m + f >= 1) {
+    if (m + f > 30) throw new HttpError(400, 'invalid_count')
+    return m + f
+  }
+  return fallback
+}
+
+async function writeProfile(tx: Queryable, hhCode: string, profile: Array<{ col: string; value: unknown }>) {
+  if (profile.length === 0) return
+  const sets = profile.map((p, i) => `${p.col} = $${i + 2}`).join(', ')
+  await tx.query(`UPDATE households SET ${sets} WHERE hh_code = $1`, [hhCode, ...profile.map((p) => p.value)])
+}
+
+/** Household profile report: one row per household + vulnerability summary (meal/supervisor/admin). */
+export async function householdProfileReport(db: Database, actor: Actor, filters: { dp?: string; district?: string }) {
+  if (actor.role === 'dp_focal') throw new HttpError(403, 'forbidden')
+  let dps = filters.dp ? [filters.dp.toUpperCase()] : await accessibleDpCodes(db, actor)
+  for (const code of dps) assertDpAccess(actor, code)
+  if (filters.district) {
+    const inD = await db.query(`SELECT code FROM distribution_points WHERE district = $1`, [filters.district])
+    const allowed = new Set(inD.map((r) => String(r.code)))
+    dps = dps.filter((d) => allowed.has(d))
+  }
+  if (dps.length === 0) return { rows: [], summary: emptySummary() }
+  const clause = inClause(dps, 1)
+  const rows = await db.query(
+    `SELECT h.*, d.district, d.name_en, d.name_ar FROM households h JOIN distribution_points d ON d.code = h.dp_code
+     WHERE h.dp_code IN (${clause.sql}) ORDER BY h.hh_code LIMIT 5000`,
+    dps,
+  )
+  const out = rows.map((row) => ({
+    hhCode: String(row.hh_code),
+    dpCode: String(row.dp_code),
+    district: String(row.district),
+    dpNameAr: row.name_ar == null ? null : String(row.name_ar),
+    familyName: row.family_name == null ? null : String(row.family_name),
+    beneficiaryCount: Number(row.beneficiary_count),
+    status: String(row.status),
+    ...profileFromRow(row),
+  }))
+  const summary = emptySummary()
+  for (const r of out) {
+    summary.households += 1
+    summary.members += r.beneficiaryCount
+    summary.males += Number(r.males ?? 0)
+    summary.females += Number(r.females ?? 0)
+    if (r.hasPlw) summary.plw += 1
+    if (r.hasDisability) summary.disability += 1
+    if (r.hasElderly) summary.elderly += 1
+    if (r.femaleHeaded) summary.femaleHeaded += 1
+    if (r.noCookingMeans) summary.noCookingMeans += 1
+    if (r.specialArrangements) summary.specialArrangements += 1
+    if (r.displacementStatus === 'idp') summary.idp += 1
+    if (r.displacementStatus === 'host') summary.host += 1
+    if (r.displacementStatus === 'returnee') summary.returnee += 1
+  }
+  return { rows: out, summary }
+}
+
+function emptySummary() {
+  return { households: 0, members: 0, males: 0, females: 0, plw: 0, disability: 0, elderly: 0, femaleHeaded: 0, noCookingMeans: 0, specialArrangements: 0, idp: 0, host: 0, returnee: 0 }
 }

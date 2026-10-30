@@ -3,6 +3,7 @@ import { normalizeHhCode } from '@hdp/rules'
 import { apiJson } from '../api'
 import { explainError } from '../errors'
 import { QrCard } from '../components/QrCard'
+import { HouseholdProfileForm, pickProfile, profilePayload, type HouseholdProfile } from '../components/HouseholdProfileForm'
 import { buildCardsPdf } from '../cardsPdf'
 import { Alert, Button, EmptyState, Field, PageHeader, Panel, SelectInput, TextInput } from '../components/ui'
 import { useI18n } from '../i18n'
@@ -13,6 +14,7 @@ interface Household {
   beneficiaryCount: number
   label: string | null
   familyName?: string | null
+  headName?: string | null
   status: string
   activeCardCode: string | null
   payload?: string | null
@@ -93,6 +95,8 @@ export function CardsPage() {
   const [editDp, setEditDp] = useState('')
   const [editLabel, setEditLabel] = useState('')
   const [editFamily, setEditFamily] = useState('')
+  const [editProfile, setEditProfile] = useState<HouseholdProfile>({})
+  const [baseProfile, setBaseProfile] = useState('')
   const [editCount, setEditCount] = useState('1')
   const [saving, setSaving] = useState(false)
   const [bulkLoading, setBulkLoading] = useState(false)
@@ -124,6 +128,9 @@ export function CardsPage() {
     setEditDp(hh.dpCode)
     setEditLabel(hh.label ?? '')
     setEditFamily(hh.familyName ?? '')
+    const prof = pickProfile(hh as unknown as Record<string, unknown>)
+    setEditProfile(prof)
+    setBaseProfile(JSON.stringify(profilePayload(prof)))
     setEditCount(String(hh.beneficiaryCount || 1))
     setMessage('')
     setBulkActive(false)
@@ -146,6 +153,7 @@ export function CardsPage() {
           label: editLabel.trim() ? editLabel.trim() : null,
           familyName: editFamily.trim() ? editFamily.trim() : null,
           beneficiaryCount: count,
+          ...profilePayload(editProfile),
         }),
       })
       setTone('ok')
@@ -217,6 +225,7 @@ export function CardsPage() {
     (editDp !== selected.dpCode ||
       (editLabel.trim() || '') !== (selected.label ?? '') ||
       (editFamily.trim() || '') !== (selected.familyName ?? '') ||
+      JSON.stringify(profilePayload(editProfile)) !== baseProfile ||
       Number(editCount) !== selected.beneficiaryCount)
 
   return (
@@ -262,7 +271,7 @@ export function CardsPage() {
                   <span className="font-mono font-semibold">{row.hhCode}</span>
                   <span className="mt-0.5 block text-xs text-muted">
                     {row.dpCode}
-                    {row.familyName ? ` · ${row.familyName}` : ''}{row.label ? ` · ${row.label}` : ''} · {t('beneficiaryCount')}: {row.beneficiaryCount}
+                    {row.familyName ? ` · ${row.familyName}` : ''}{row.headName ? ` · ${row.headName}` : ''}{row.label ? ` · ${row.label}` : ''} · {t('beneficiaryCount')}: {row.beneficiaryCount}
                   </span>
                 </span>
                 <span className={`text-xs font-bold ${row.activeCardCode ? 'text-served' : 'text-blocked'}`}>
@@ -311,6 +320,7 @@ export function CardsPage() {
                 onChange={(event) => setEditCount(event.target.value.replace(/[^\d]/g, '').slice(0, 2))}
               />
             </Field>
+            <HouseholdProfileForm value={editProfile} onChange={setEditProfile} />
             <Button data-testid="save-household" type="button" disabled={!dirty || saving || !editDp} onClick={() => void saveDetails()}>
               {saving ? t('loading') : t('saveHousehold')}
             </Button>

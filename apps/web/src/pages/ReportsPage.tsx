@@ -19,6 +19,7 @@ import {
 import { apiJson } from '../api'
 import { explainError } from '../errors'
 import { useI18n } from '../i18n'
+import { PROFILE_KEYS, PROFILE_LABELS, profileValueLabel, type HouseholdProfile } from '../components/HouseholdProfileForm'
 import { Alert, Button, EmptyState, Field, PageHeader, Panel, SelectInput, TextInput } from '../components/ui'
 
 interface DpRow {
@@ -692,6 +693,156 @@ export function ReportsPage() {
           <p className="text-sm text-muted">{lb.loading}</p>
         </Panel>
       ) : null}
+      <HouseholdProfilePanel dp={dp} district={district} />
+    </div>
+  )
+}
+
+type ProfileRow = HouseholdProfile & { hhCode: string; dpCode: string; district: string; dpNameAr: string | null; familyName: string | null; beneficiaryCount: number; status: string }
+type ProfileSummary = Record<'households' | 'members' | 'males' | 'females' | 'plw' | 'disability' | 'elderly' | 'femaleHeaded' | 'noCookingMeans' | 'specialArrangements' | 'idp' | 'host' | 'returnee', number>
+
+const VULN_FILTERS: Array<[string, string, string]> = [
+  ['', 'كل الأسر', 'All households'],
+  ['hasPlw', 'حوامل أو مرضعات', 'PLW'],
+  ['hasDisability', 'إعاقة', 'Disability'],
+  ['hasElderly', 'مسن', 'Elderly'],
+  ['femaleHeaded', 'تعولها امرأة', 'Female-headed'],
+  ['noCookingMeans', 'لا تمتلك وسائل طهي', 'No cooking means'],
+  ['specialArrangements', 'ترتيبات خاصة', 'Special arrangements'],
+  ['idp', 'نازح', 'IDP'],
+  ['host', 'مقيم', 'Host'],
+  ['returnee', 'عائد', 'Returnee'],
+]
+
+function HouseholdProfilePanel({ dp, district }: { dp: string; district: string }) {
+  const { locale } = useI18n()
+  const ar = locale === 'ar'
+  const [data, setData] = useState<{ rows: ProfileRow[]; summary: ProfileSummary } | null>(null)
+  const [filter, setFilter] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function load() {
+    setLoading(true)
+    setError('')
+    try {
+      const params = new URLSearchParams()
+      if (dp) params.set('dp', dp)
+      if (district) params.set('district', district)
+      setData(await apiJson(`/api/reports/households?${params.toString()}`))
+    } catch (err) {
+      setError(String((err as Error).message || err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const rows = (data?.rows ?? []).filter((r) => {
+    if (!filter) return true
+    if (['idp', 'host', 'returnee'].includes(filter)) return r.displacementStatus === filter
+    return Boolean(r[filter as keyof HouseholdProfile])
+  })
+
+  function exportCsv() {
+    const header = ['hh_code', 'dp_code', 'district', 'family_name', 'beneficiary_count', 'status', ...PROFILE_KEYS.map((k) => `${PROFILE_LABELS[k][1]} / ${PROFILE_LABELS[k][0]}`)]
+    downloadCsv(
+      `hdp-household-profile-${adenDate()}.csv`,
+      header,
+      rows.map((r) => [r.hhCode, r.dpCode, r.district, r.familyName, r.beneficiaryCount, r.status, ...PROFILE_KEYS.map((k) => profileValueLabel(k, r[k], ar))]),
+    )
+  }
+
+  const s = data?.summary
+  const tiles: Array<[string, number | undefined]> = s
+    ? [
+        [ar ? 'الأسر' : 'Households', s.households],
+        [ar ? 'الأفراد' : 'Members', s.members],
+        [ar ? 'ذكور' : 'Males', s.males],
+        [ar ? 'إناث' : 'Females', s.females],
+        [ar ? 'حوامل/مرضعات' : 'PLW', s.plw],
+        [ar ? 'إعاقة' : 'Disability', s.disability],
+        [ar ? 'مسن' : 'Elderly', s.elderly],
+        [ar ? 'تعولها امرأة' : 'Female-headed', s.femaleHeaded],
+        [ar ? 'بلا وسائل طهي' : 'No cooking means', s.noCookingMeans],
+        [ar ? 'ترتيبات خاصة' : 'Special arrangements', s.specialArrangements],
+        [ar ? 'نازح' : 'IDP', s.idp],
+        [ar ? 'مقيم' : 'Host', s.host],
+        [ar ? 'عائد' : 'Returnee', s.returnee],
+      ]
+    : []
+  return (
+    <div data-testid="household-profile-report">
+    <Panel className="grid gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-bold">{ar ? 'ملف الأسر (بيانات التسجيل المسبق)' : 'Household profile (pre-registration)'}</h2>
+        <div className="flex gap-2">
+          <Button type="button" size="sm" onClick={() => void load()} disabled={loading}>
+            {loading ? '…' : ar ? 'تحميل' : 'Load'}
+          </Button>
+          <Button type="button" size="sm" tone="teal" disabled={!data || rows.length === 0} onClick={exportCsv}>
+            CSV
+          </Button>
+        </div>
+      </div>
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      {s ? (
+        <>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+            {tiles.map(([label, n]) => (
+              <div key={label} className="rounded-xl border border-line p-2 text-center">
+                <p className="text-xl font-bold tabular">{n ?? 0}</p>
+                <p className="text-xs text-muted">{label}</p>
+              </div>
+            ))}
+          </div>
+          <Field label={ar ? 'تصفية' : 'Filter'}>
+            <SelectInput value={filter} onChange={(e) => setFilter(e.target.value)}>
+              {VULN_FILTERS.map(([v, a, e]) => (
+                <option key={v} value={v}>{ar ? a : e}</option>
+              ))}
+            </SelectInput>
+          </Field>
+          {rows.length === 0 ? (
+            <EmptyState title={ar ? 'لا توجد أسر' : 'No households'} />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-start text-xs text-muted">
+                    <th className="p-1 text-start">HH</th>
+                    <th className="p-1 text-start">{ar ? 'اسم الأسرة' : 'Family'}</th>
+                    <th className="p-1 text-start">{ar ? 'رب/ربة الأسرة' : 'Head'}</th>
+                    <th className="p-1">{ar ? 'العدد' : 'Size'}</th>
+                    <th className="p-1">{ar ? 'النزوح' : 'Status'}</th>
+                    <th className="p-1">{ar ? 'الهشاشة' : 'Vulnerability'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.slice(0, 300).map((r) => (
+                    <tr key={r.hhCode} className="border-t border-line">
+                      <td className="p-1 font-mono" dir="ltr">{r.hhCode}</td>
+                      <td className="p-1">{r.familyName ?? ''}</td>
+                      <td className="p-1">{r.headName ?? ''}</td>
+                      <td className="p-1 text-center tabular">{r.beneficiaryCount}</td>
+                      <td className="p-1 text-center">{profileValueLabel('displacementStatus', r.displacementStatus, ar)}</td>
+                      <td className="p-1 text-xs">
+                        {(['hasPlw', 'hasDisability', 'hasElderly', 'femaleHeaded', 'noCookingMeans', 'specialArrangements'] as const)
+                          .filter((k) => r[k])
+                          .map((k) => PROFILE_LABELS[k][ar ? 0 : 1])
+                          .join(' · ')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {rows.length > 300 ? <p className="mt-1 text-xs text-muted">{ar ? 'يُعرض أول 300 — صدّر CSV للكل' : 'Showing first 300 — export CSV for all'}</p> : null}
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="text-sm text-muted">{ar ? 'اضغط تحميل لعرض الملخص وفق عوامل التصفية أعلاه (النقطة / المديرية).' : 'Press Load to see the summary for the point / district filters above.'}</p>
+      )}
+    </Panel>
     </div>
   )
 }

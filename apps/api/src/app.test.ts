@@ -107,6 +107,29 @@ describe('meal scans', () => {
     expect(list.some((row) => row.hhCode === hh.hhCode)).toBe(true)
   })
 
+  it('stores the pre-registration profile, computes total, and reports it', async () => {
+    const meal = await login('meal.taiz')
+    const created = await app.request('/api/households', {
+      method: 'POST',
+      headers: auth(meal.token),
+      body: JSON.stringify({ dpCode: 'MDF01', beneficiaryCount: 1, familyName: 'آل سعيد', headGender: 'female', headAge: 41, males: 2, females: 3, hasPlw: true, displacementStatus: 'idp', femaleHeaded: true, eligibilityCardStatus: 'none' }),
+    })
+    expect(created.status).toBe(201)
+    const hh = (await created.json()) as { hhCode: string; beneficiaryCount: number }
+    expect(hh.beneficiaryCount).toBe(5)
+    const bad = await app.request(`/api/households/${hh.hhCode}`, { method: 'PATCH', headers: auth(meal.token), body: JSON.stringify({ headGender: 'x' }) })
+    expect(bad.status).toBe(400)
+    const patched = await app.request(`/api/households/${hh.hhCode}`, { method: 'PATCH', headers: auth(meal.token), body: JSON.stringify({ hasDisability: true, females: 4 }) })
+    expect(patched.status).toBe(200)
+    const detail = (await (await app.request(`/api/households/${hh.hhCode}`, { headers: auth(meal.token) })).json()) as Record<string, unknown>
+    expect(detail.hasDisability).toBe(true)
+    expect(detail.beneficiaryCount).toBe(6)
+    expect(detail.headAge).toBe(41)
+    const report = (await (await app.request('/api/reports/households', { headers: auth(meal.token) })).json()) as { summary: { plw: number; idp: number } }
+    expect(report.summary.plw).toBeGreaterThanOrEqual(1)
+    expect(report.summary.idp).toBeGreaterThanOrEqual(1)
+  })
+
   it('serves once per household per Aden day and blocks the second scan', async () => {
     const focal = await login('focal.mudhaffar')
     const first = await postScan(focal.token, scan(focal.user.id))

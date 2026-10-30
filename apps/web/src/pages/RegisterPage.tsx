@@ -3,6 +3,7 @@ import { apiJson } from '../api'
 import { explainError } from '../errors'
 import { useAuth } from '../auth'
 import { QrCard } from '../components/QrCard'
+import { HouseholdProfileForm, profilePayload, type HouseholdProfile } from '../components/HouseholdProfileForm'
 import { Alert, Button, Field, PageHeader, Panel, SelectInput, TextInput } from '../components/ui'
 import { useI18n } from '../i18n'
 
@@ -52,6 +53,8 @@ export function RegisterPage() {
   const [count, setCount] = useState('5')
   const [label, setLabel] = useState('')
   const [familyName, setFamilyName] = useState('')
+  const [profile, setProfile] = useState<HouseholdProfile>({})
+  const autoTotal = profile.males != null || profile.females != null ? (profile.males ?? 0) + (profile.females ?? 0) : null
   const [issued, setIssued] = useState<Issued | null>(null)
   const [error, setError] = useState('')
 
@@ -70,7 +73,7 @@ export function RegisterPage() {
     try {
       const body = await apiJson<Issued>('/api/households', {
         method: 'POST',
-        body: JSON.stringify({ dpCode: dp, beneficiaryCount: Number(count), label, familyName: familyName.trim() || null }),
+        body: JSON.stringify({ dpCode: dp, beneficiaryCount: autoTotal && autoTotal > 0 ? autoTotal : Number(count), label, familyName: familyName.trim() || null, ...profilePayload(profile) }),
       })
       setIssued(body)
     } catch (err) {
@@ -95,7 +98,7 @@ export function RegisterPage() {
             </SelectInput>
           </Field>
           <Field label={t('beneficiaryCount')}>
-            <TextInput data-testid="register-count" inputMode="numeric" value={count} onChange={(event) => setCount(event.target.value)} />
+            <TextInput data-testid="register-count" inputMode="numeric" value={autoTotal && autoTotal > 0 ? String(autoTotal) : count} disabled={autoTotal != null && autoTotal > 0} onChange={(event) => setCount(event.target.value)} />
           </Field>
           <Field label={t('familyName')}>
             <TextInput data-testid="register-family" value={familyName} onChange={(event) => setFamilyName(event.target.value)} maxLength={80} />
@@ -103,6 +106,7 @@ export function RegisterPage() {
           <Field label={t('label')}>
             <TextInput value={label} onChange={(event) => setLabel(event.target.value)} maxLength={80} />
           </Field>
+          <HouseholdProfileForm value={profile} onChange={setProfile} />
           <Button data-testid="register-submit" type="submit" size="lg">
             {t('register')}
           </Button>

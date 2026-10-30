@@ -1,0 +1,20 @@
+-- Pre-registration household profile (from the paper pre-registration form).
+ALTER TABLE households ADD COLUMN IF NOT EXISTS head_name TEXT;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS spouse_name TEXT;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS head_gender TEXT;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS head_age INTEGER;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS id_number TEXT;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS males_count INTEGER;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS females_count INTEGER;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS has_plw BOOLEAN;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS has_disability BOOLEAN;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS has_elderly BOOLEAN;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS displacement_status TEXT;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS female_headed BOOLEAN;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS no_cooking_means BOOLEAN;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS special_arrangements BOOLEAN;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS eligibility_card_status TEXT;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS location_name TEXT;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS remarks TEXT;
+ALTER TABLE households ADD COLUMN IF NOT EXISTS registration_date DATE;

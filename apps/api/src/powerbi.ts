@@ -122,6 +122,9 @@ export async function feed(db: Database, name: FeedName, f: FeedFilters): Promis
       const parts = dpClause('h', f, args)
       return db.query(
         `SELECT h.hh_code, h.dp_code, d.district, h.beneficiary_count, h.status,
+                h.head_gender, h.head_age, h.males_count, h.females_count, h.has_plw, h.has_disability, h.has_elderly,
+                h.displacement_status, h.female_headed, h.no_cooking_means, h.special_arrangements,
+                h.eligibility_card_status, h.location_name, h.registration_date,
                 (h.active_card_code IS NOT NULL) AS has_active_card, h.created_at, h.updated_at
          FROM households h JOIN distribution_points d ON d.code = h.dp_code
          ${where(parts)} ORDER BY h.hh_code LIMIT ${MAX_ROWS}`,

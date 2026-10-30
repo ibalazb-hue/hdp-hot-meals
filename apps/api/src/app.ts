@@ -39,7 +39,9 @@ import {
   voidCard,
   type Actor,
   type IncomingScan,
+  householdProfileReport,
 } from './domain.js'
+import { hasProfileInput, profileSchema } from './profile.js'
 import { FEEDS, feed, powerBiKeyStatus, revokePowerBiKey, rotatePowerBiKey, toCsv, verifyPowerBiKey, type FeedName } from './powerbi.js'
 
 const uuid = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
@@ -178,6 +180,7 @@ export function createApp(db: Database, options?: { distDir?: string }) {
         beneficiaryCount: z.number().int().min(1).max(30),
         label: z.string().max(80).nullish(),
         familyName: z.string().max(80).nullish(),
+        ...profileSchema(),
       }),
       await c.req.json(),
     )
@@ -191,9 +194,10 @@ export function createApp(db: Database, options?: { distDir?: string }) {
           dpCode: z.string().min(2).max(8).optional(),
           label: z.string().max(80).nullish(),
           familyName: z.string().max(80).nullish(),
+          ...profileSchema(),
           beneficiaryCount: z.number().int().min(1).max(30).optional(),
         })
-        .refine((value) => value.dpCode !== undefined || value.label !== undefined || value.familyName !== undefined || value.beneficiaryCount !== undefined, {
+        .refine((value) => value.dpCode !== undefined || value.label !== undefined || value.familyName !== undefined || value.beneficiaryCount !== undefined || hasProfileInput(value), {
           message: 'empty',
         }),
       await c.req.json(),
@@ -225,6 +229,11 @@ export function createApp(db: Database, options?: { distDir?: string }) {
     const date = c.req.query('date') ?? adenDate()
     if (!day.safeParse(date).success) throw new HttpError(400, 'invalid_body')
     return c.json(await reconciliation(db, c.get('actor'), date))
+  })
+  app.get('/api/reports/households', async (c) => {
+    const district = c.req.query('district') || undefined
+    if (district && !['Al-Mudhaffar', 'Al-Qahira'].includes(district)) throw new HttpError(400, 'invalid_body')
+    return c.json(await householdProfileReport(db, c.get('actor'), { dp: c.req.query('dp') || undefined, district }))
   })
   app.get('/api/reports', async (c) => {
     const to = c.req.query('to') ?? adenDate()
