@@ -40,6 +40,7 @@ interface Issued {
   partnerPhone?: string | null
   partnerWhatsapp?: string | null
   reassuranceTextAr?: string | null
+  workingHoursAr?: string | null
   personalNoticeAr?: string | null
   showSerial?: boolean
   showBatch?: boolean
@@ -144,6 +145,7 @@ export function RegisterPage() {
               partnerPhone={issued.partnerPhone}
               partnerWhatsapp={issued.partnerWhatsapp}
               reassuranceTextAr={issued.reassuranceTextAr}
+              workingHoursAr={issued.workingHoursAr}
               personalNoticeAr={issued.personalNoticeAr}
               showSerial={issued.showSerial}
               showBatch={issued.showBatch}

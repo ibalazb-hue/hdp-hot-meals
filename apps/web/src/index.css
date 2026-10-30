@@ -192,6 +192,7 @@ textarea {
 .ec-panel-title { display: flex; justify-content: center; align-items: center; gap: 1mm; font-size: 2.4mm; font-weight: 700; color: var(--card-teal); }
 .ec-panel-num { margin-top: 0.8mm; font-size: 3.5mm; font-weight: 700; font-family: ui-monospace, Menlo, Consolas, monospace; }
 .card-icon { width: 3mm; height: 3mm; flex: none; }
+.ec-hours { margin: 1.5mm 0 0; font-size: 2.2mm; font-weight: 600; text-align: center; color: var(--card-teal); }
 .ec-reassure { margin: 2mm 0 0; min-height: 9mm; display: flex; align-items: center; justify-content: center; padding: 1mm 1.5mm; border: 0.25mm dashed var(--card-teal); border-radius: 1.5mm; line-height: 1.35; font-size: 2.45mm; font-weight: 700; text-align: center; color: #0b1f2a; }
 .ec-notice { margin: 1.2mm 0 0; font-size: 2.15mm; text-align: center; color: #445; }
 .ec-meta { margin-top: auto; display: flex; justify-content: space-between; gap: 2mm; font-size: 1.85mm; color: #667; font-family: ui-monospace, Menlo, Consolas, monospace; }

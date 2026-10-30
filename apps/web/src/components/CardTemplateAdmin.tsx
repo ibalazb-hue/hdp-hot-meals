@@ -26,6 +26,7 @@ export interface CardTemplateForm {
   partnerPhone: string
   partnerWhatsapp: string
   reassuranceTextAr: string
+  workingHoursAr: string
   personalNoticeAr: string
   wfpHotline: string
   hdpHotline: string
@@ -211,6 +212,9 @@ export function CardTemplateAdmin() {
             </div>
           </div>
 
+          <Field label={t('workingHoursAr')}>
+            <TextInput dir="rtl" data-testid="tpl-working-hours" value={form.workingHoursAr ?? ''} maxLength={200} onChange={(e) => patch('workingHoursAr', e.target.value)} />
+          </Field>
           <Field label={t('reassuranceTextAr')}>
             <textarea
               dir="rtl"
@@ -288,6 +292,7 @@ export function CardTemplateAdmin() {
           partnerPhone={form.partnerPhone}
           partnerWhatsapp={form.partnerWhatsapp}
           reassuranceTextAr={form.reassuranceTextAr}
+          workingHoursAr={form.workingHoursAr}
           personalNoticeAr={form.personalNoticeAr}
           validFrom={form.validFrom || '2026-01-01'}
           validTo={form.validTo || '2026-12-31'}

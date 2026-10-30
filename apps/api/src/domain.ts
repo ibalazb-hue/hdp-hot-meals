@@ -643,6 +643,7 @@ export interface CardTemplate {
   partnerPhone: string
   partnerWhatsapp: string
   reassuranceTextAr: string
+  workingHoursAr: string
   personalNoticeAr: string
   /** @deprecated kept for older clients; mirrored into hdpPhone when empty */
   wfpHotline: string
@@ -672,7 +673,7 @@ export function defaultCardTemplate(): CardTemplate {
     rulesText: 'وجبة واحدة لكل أسرة في اليوم.\nالبطاقة شخصية وغير قابلة للبيع.\nبلّغ عن الفقدان في مكتب المساعدة.',
     freeLineEn: 'Assistance is FREE – do not pay anyone.',
     freeLineAr: 'المساعدة مجانية — لا تدفع لأي شخص',
-    complaintsHeadingAr: 'الشكاوى والمقترحات',
+    complaintsHeadingAr: 'للشكاوى والمقتراحات يمكنكم التواصل على',
     hotlineHeadingAr: 'الخط الساخن',
     hdpPanelTitleAr: 'برنامج التنمية الإنسانية',
     hdpPhone: hdpHotline,
@@ -680,6 +681,7 @@ export function defaultCardTemplate(): CardTemplate {
     partnerPanelTitleAr: '',
     partnerPhone: '',
     partnerWhatsapp: '',
+    workingHoursAr: 'أوقات الدوام الرسمي: السبت – الخميس، 8:00 صباحاً – 2:00 ظهراً',
     reassuranceTextAr: 'المساعدة مجانية بالكامل — لا تدفع لأي شخص. وجبة واحدة لكل أسرة في اليوم.',
     personalNoticeAr: 'هذه البطاقة شخصية وغير قابلة للبيع. بلّغ عن الفقدان في مكتب المساعدة.',
     wfpHotline: process.env.WFP_HOTLINE?.trim() || '',
@@ -730,7 +732,7 @@ export function normalizeCardTemplate(input: Partial<CardTemplate> | null | unde
     rulesText: rules.replace(/\r\n/g, '\n').trim().slice(0, 2000) || base.rulesText,
     freeLineEn: (input.freeLineEn != null ? String(input.freeLineEn) : base.freeLineEn).trim().slice(0, 200) || base.freeLineEn,
     freeLineAr: (input.freeLineAr != null ? String(input.freeLineAr) : base.freeLineAr).trim().slice(0, 200) || base.freeLineAr,
-    complaintsHeadingAr: (input.complaintsHeadingAr != null ? String(input.complaintsHeadingAr) : base.complaintsHeadingAr).trim().slice(0, 120) || base.complaintsHeadingAr,
+    complaintsHeadingAr: legacyTitle((input.complaintsHeadingAr != null ? String(input.complaintsHeadingAr) : base.complaintsHeadingAr).trim().slice(0, 120), ['الشكاوى والمقترحات', 'الشكاوى']) || base.complaintsHeadingAr,
     hotlineHeadingAr: (input.hotlineHeadingAr != null ? String(input.hotlineHeadingAr) : base.hotlineHeadingAr).trim().slice(0, 80) || base.hotlineHeadingAr,
     hdpPanelTitleAr: (input.hdpPanelTitleAr != null ? String(input.hdpPanelTitleAr) : base.hdpPanelTitleAr).trim().slice(0, 120) || base.hdpPanelTitleAr,
     hdpPhone: hdpPhoneRaw || hdpHotline,
@@ -738,6 +740,7 @@ export function normalizeCardTemplate(input: Partial<CardTemplate> | null | unde
     partnerPanelTitleAr: (input.partnerPanelTitleAr != null ? String(input.partnerPanelTitleAr) : base.partnerPanelTitleAr).trim().slice(0, 120),
     partnerPhone: (input.partnerPhone != null ? String(input.partnerPhone) : base.partnerPhone).trim().slice(0, 80),
     partnerWhatsapp: (input.partnerWhatsapp != null ? String(input.partnerWhatsapp) : base.partnerWhatsapp).trim().slice(0, 80),
+    workingHoursAr: (input.workingHoursAr != null ? String(input.workingHoursAr) : base.workingHoursAr).trim().slice(0, 200),
     reassuranceTextAr: (input.reassuranceTextAr != null ? String(input.reassuranceTextAr) : base.reassuranceTextAr).trim().slice(0, 400) || base.reassuranceTextAr,
     personalNoticeAr: (input.personalNoticeAr != null ? String(input.personalNoticeAr) : base.personalNoticeAr).trim().slice(0, 300) || base.personalNoticeAr,
     wfpHotline: (input.wfpHotline != null ? String(input.wfpHotline) : base.wfpHotline).trim().slice(0, 80),
@@ -824,6 +827,7 @@ function cardPrintFields(template: CardTemplate, cardCode: string | null, issued
     partnerPhone: template.partnerPhone || null,
     partnerWhatsapp: template.partnerWhatsapp || null,
     reassuranceTextAr: template.reassuranceTextAr,
+    workingHoursAr: template.workingHoursAr,
     personalNoticeAr: template.personalNoticeAr,
     wfpHotline: template.wfpHotline || null,
     hdpHotline: template.hdpHotline || template.hdpPhone || null,

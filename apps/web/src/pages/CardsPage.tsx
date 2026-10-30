@@ -41,6 +41,7 @@ interface Household {
   partnerPhone?: string | null
   partnerWhatsapp?: string | null
   reassuranceTextAr?: string | null
+  workingHoursAr?: string | null
   personalNoticeAr?: string | null
   showSerial?: boolean
   showBatch?: boolean
@@ -80,6 +81,7 @@ function cardProps(hh: Household) {
     partnerPhone: hh.partnerPhone,
     partnerWhatsapp: hh.partnerWhatsapp,
     reassuranceTextAr: hh.reassuranceTextAr,
+    workingHoursAr: hh.workingHoursAr,
     personalNoticeAr: hh.personalNoticeAr,
     showSerial: hh.showSerial,
     showBatch: hh.showBatch,

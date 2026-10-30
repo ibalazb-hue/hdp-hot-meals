@@ -30,6 +30,7 @@ export interface EntitlementCardProps {
   partnerPhone?: string | null
   partnerWhatsapp?: string | null
   reassuranceTextAr?: string | null
+  workingHoursAr?: string | null
   personalNoticeAr?: string | null
   showSerial?: boolean
   showBatch?: boolean
@@ -94,7 +95,7 @@ export function QrCard(props: EntitlementCardProps) {
   const dpUpper = (props.dpCode || '').toUpperCase()
   const district = dpUpper.startsWith('QAH') ? 'القاهرة' : dpUpper.startsWith('MDF') ? 'المظفر' : '—'
   const dpName = (props.dpNameAr || props.dpNameEn || props.dpCode || '—').trim() || '—'
-  const complaints = props.complaintsHeadingAr?.trim() || 'الشكاوى والمقترحات'
+  const complaints = props.complaintsHeadingAr?.trim() || 'للشكاوى والمقتراحات يمكنكم التواصل على'
   const hotlineHeading = props.hotlineHeadingAr?.trim() || 'الخط الساخن'
   const reassurance =
     props.reassuranceTextAr?.trim() ||
@@ -165,8 +166,6 @@ export function QrCard(props: EntitlementCardProps) {
       <div className="card-teal-band" aria-hidden="true" />
       <header className="ec-back-head">
         <span data-testid="card-complaints-heading">{complaints}</span>
-        <span className="ec-dot">•</span>
-        <span data-testid="card-hotline-heading">{hotlineHeading}</span>
       </header>
       <div className="ec-panels">
         <div className="ec-panel" data-testid="card-panel-hdp">
@@ -180,6 +179,7 @@ export function QrCard(props: EntitlementCardProps) {
           <div className="ec-panel-line"><WhatsAppIcon /> <span dir="ltr">{wfpWa || '—'}</span></div>
         </div>
       </div>
+      {props.workingHoursAr?.trim() ? <p className="ec-hours" data-testid="card-working-hours">{props.workingHoursAr.trim()}</p> : null}
       <p className="ec-reassure">{reassurance}</p>
       <p className="ec-notice">{notice}</p>
       {(showSerial && serial) || (showBatch && batch) ? (

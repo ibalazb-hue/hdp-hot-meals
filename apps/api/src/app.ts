@@ -391,6 +391,7 @@ export function createApp(db: Database, options?: { distDir?: string }) {
         partnerPhone: z.string().max(80).optional(),
         partnerWhatsapp: z.string().max(80).optional(),
         reassuranceTextAr: z.string().max(400).optional(),
+        workingHoursAr: z.string().max(200).optional(),
         personalNoticeAr: z.string().max(300).optional(),
         wfpHotline: z.string().max(80).optional(),
         hdpHotline: z.string().max(80).optional(),
