@@ -14,6 +14,7 @@ import {
   createSpotCheck,
   createUser,
   dashboard,
+  followUp,
   exportRegister,
   getCardTemplate,
   getHousehold,
@@ -161,6 +162,23 @@ export function createApp(db: Database, options?: { distDir?: string }) {
     return c.json(await dashboard(db, c.get('actor'), date, c.req.query('dp') || undefined))
   })
 
+  app.get('/api/followup', async (c) => {
+    const actor = c.get('actor')
+    if (actor.role === 'dp_focal') throw new HttpError(403, 'forbidden')
+    const from = c.req.query('from') ?? c.req.query('date') ?? adenDate()
+    const to = c.req.query('to') ?? from
+    if (!day.safeParse(from).success || !day.safeParse(to).success || to < from) throw new HttpError(400, 'invalid_body')
+    const district = c.req.query('district')
+    return c.json(
+      await followUp(db, actor, {
+        from,
+        to,
+        dp: c.req.query('dp') || undefined,
+        district: district === 'Al-Mudhaffar' || district === 'Al-Qahira' ? district : undefined,
+      }),
+    )
+  })
+
   app.get('/api/households', async (c) =>
     c.json(await listHouseholds(db, c.get('actor'), { q: c.req.query('q'), dp: c.req.query('dp') })),
   )
@@ -295,10 +313,14 @@ export function createApp(db: Database, options?: { distDir?: string }) {
         longitude: z.number().gte(-180).lte(180).nullish(),
         gpsRadiusM: z.number().gte(10).lte(5000).nullish(),
         gpsCheckActive: z.boolean().optional(),
+        dailyQuota: z.number().int().min(0).max(100000).nullish(),
       }),
       await c.req.json(),
     )
-    return c.json(await createDp(db, body, c.get('actor')), 201)
+    const { dailyQuota, ...rest } = body
+    const created = await createDp(db, rest, c.get('actor'))
+    if (dailyQuota !== undefined) return c.json(await patchDp(db, body.code, { dailyQuota }, c.get('actor')), 201)
+    return c.json(created, 201)
   })
   app.patch('/api/admin/dps/:code', async (c) => {
     const body = parse(
@@ -313,6 +335,7 @@ export function createApp(db: Database, options?: { distDir?: string }) {
         longitude: z.number().gte(-180).lte(180).nullish(),
         gpsRadiusM: z.number().gte(10).lte(5000).nullish(),
         gpsCheckActive: z.boolean().optional(),
+        dailyQuota: z.number().int().min(0).max(100000).nullish(),
       }),
       await c.req.json(),
     )

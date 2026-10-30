@@ -36,6 +36,7 @@ interface DpRow {
   longitude?: number | null
   gpsRadiusM?: number
   gpsCheckActive?: boolean
+  dailyQuota?: number | null
   householdCount?: number
   assignedUsers?: AssignedUser[]
 }
@@ -67,6 +68,7 @@ interface DpEdit {
   longitude: string
   gpsRadiusM: string
   gpsCheckActive: boolean
+  dailyQuota: string
   supervisorId: string | null
   distributorIds: string[]
   otherIds: string[]
@@ -109,6 +111,7 @@ export function AdminPage() {
     longitude: '',
     gpsRadiusM: '150',
     gpsCheckActive: false,
+    dailyQuota: '',
   })
   const [showCreatePoint, setShowCreatePoint] = useState(false)
   const [pointQuery, setPointQuery] = useState('')
@@ -283,6 +286,13 @@ export function AdminPage() {
   }
 
 
+  function quotaValue(raw: string): number | null {
+    const v = raw.trim()
+    if (!v) return null
+    const n = Math.floor(Number(v))
+    return Number.isFinite(n) && n >= 0 ? n : null
+  }
+
   function parseGpsFields(fields: { latitude: string; longitude: string; gpsRadiusM: string; gpsCheckActive: boolean }) {
     const latRaw = fields.latitude.trim()
     const lngRaw = fields.longitude.trim()
@@ -327,6 +337,7 @@ export function AdminPage() {
       longitude: dp.longitude == null ? '' : String(dp.longitude),
       gpsRadiusM: String(dp.gpsRadiusM ?? 150),
       gpsCheckActive: Boolean(dp.gpsCheckActive),
+      dailyQuota: dp.dailyQuota == null ? '' : String(dp.dailyQuota),
       supervisorId: supervisors[0]?.id ?? null,
       distributorIds: distributors.map((user) => user.id),
       otherIds: others.map((user) => user.id),
@@ -381,6 +392,7 @@ export function AdminPage() {
           district: point.district,
           active: point.active,
           ...gps,
+          dailyQuota: quotaValue(point.dailyQuota),
         }),
       })
       flash(t('dpCreated'))
@@ -394,6 +406,7 @@ export function AdminPage() {
         longitude: '',
         gpsRadiusM: '150',
         gpsCheckActive: false,
+        dailyQuota: '',
       })
       setShowCreatePoint(false)
       reload()
@@ -421,6 +434,7 @@ export function AdminPage() {
           active: editingPoint.active,
           userIds: pointUserIds(editingPoint),
           ...gps,
+          dailyQuota: quotaValue(editingPoint.dailyQuota),
         }),
       })
       setEditingPoint(null)
@@ -788,6 +802,15 @@ export function AdminPage() {
                         onChange={(event) => setPoint({ ...point, gpsRadiusM: event.target.value })}
                       />
                     </Field>
+                    <Field label={t('dailyQuota')} hint={t('dailyQuotaHint')}>
+                      <TextInput
+                        id="create-dp-quota"
+                        dir="ltr"
+                        inputMode="numeric"
+                        value={point.dailyQuota}
+                        onChange={(event) => setPoint({ ...point, dailyQuota: event.target.value.replace(/[^\d]/g, '').slice(0, 6) })}
+                      />
+                    </Field>
                   </div>
                   <label className="flex min-h-12 items-center gap-2 font-semibold">
                     <input
@@ -875,6 +898,15 @@ export function AdminPage() {
                         inputMode="numeric"
                         value={editingPoint.gpsRadiusM}
                         onChange={(event) => setEditingPoint({ ...editingPoint, gpsRadiusM: event.target.value })}
+                      />
+                    </Field>
+                    <Field label={t('dailyQuota')} hint={t('dailyQuotaHint')}>
+                      <TextInput
+                        id="edit-dp-quota"
+                        dir="ltr"
+                        inputMode="numeric"
+                        value={editingPoint.dailyQuota}
+                        onChange={(event) => setEditingPoint({ ...editingPoint, dailyQuota: event.target.value.replace(/[^\d]/g, '').slice(0, 6) })}
                       />
                     </Field>
                   </div>
@@ -1020,6 +1052,9 @@ export function AdminPage() {
                           <span className="rounded-full bg-mist px-2.5 py-1">
                             {t('pointDistributors')}:{' '}
                             <span className="tabular text-ink">{staff.filter((user) => user.role === 'dp_focal').length}</span>
+                          </span>
+                          <span className="rounded-full bg-mist px-2.5 py-1">
+                            {t('quotaToday')}: <span className="tabular text-ink">{dp.dailyQuota ?? '—'}</span>
                           </span>
                           <span className={`rounded-full px-2.5 py-1 ${dp.gpsCheckActive ? 'bg-teal/15 text-teal' : 'bg-mist'}`}>
                             {dp.gpsCheckActive ? t('gpsOn') : t('gpsOff')}

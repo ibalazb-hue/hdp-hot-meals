@@ -12,6 +12,9 @@ interface DashBody {
   blocked: number
   byReason: Record<string, number>
   byResult?: Record<string, number>
+  dailyQuota?: number | null
+  quotaRemaining?: number | null
+  quotaAchievement?: number | null
 }
 
 interface ReconRow {
@@ -35,6 +38,7 @@ export function DashboardPage() {
   const [dp, setDp] = useState(assigned.length === 1 ? assigned[0] : '')
   const [served, setServed] = useState(0)
   const [blocked, setBlocked] = useState(0)
+  const [quota, setQuota] = useState<{ q: number; rem: number; pct: number | null } | null>(null)
   const [reasons, setReasons] = useState<Record<string, number>>({})
   const [pending, setPending] = useState(0)
   const [fixes, setFixes] = useState<LocalScan[]>([])
@@ -56,6 +60,7 @@ export function DashboardPage() {
         const remote = await apiJson<DashBody>(`/api/dashboard?date=${date}${dp ? `&dp=${dp}` : ''}`)
         setServed(remote.uniqueServed)
         setBlocked(remote.blocked)
+        setQuota(remote.dailyQuota ? { q: remote.dailyQuota, rem: remote.quotaRemaining ?? 0, pct: remote.quotaAchievement ?? null } : null)
         setReasons(remote.byReason)
       } catch {
         const local = (await db.scans.where('scanDate').equals(date).toArray()).filter((scan) => !dp || scan.dpCode === dp)
@@ -115,6 +120,8 @@ export function DashboardPage() {
         ) : null}
         <StatCard label={t('servedToday')} value={canRecon ? reconServed || served : served} tone="ok" />
         <StatCard label={t('blockedToday')} value={blocked} tone="danger" />
+        {quota ? <StatCard label={t('quotaToday')} value={quota.q} tone="teal" hint={`${t('quotaRemaining')}: ${quota.rem}`} /> : null}
+        {quota ? <StatCard label={t('quotaAchievement')} value={quota.pct == null ? '—' : `${Math.round(quota.pct * 100)}%`} tone={quota.pct != null && quota.pct >= 1 ? 'ok' : 'warn'} /> : null}
         {canRecon ? (
           <StatCard
             label={t('variance')}

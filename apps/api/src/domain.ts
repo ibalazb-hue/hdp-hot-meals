@@ -614,7 +614,108 @@ export async function dashboard(db: Database, actor: Actor, scanDate: string, dp
       byReason[reason] = (byReason[reason] ?? 0) + 1
     }
   }
-  return { scanDate, dpCodes: dps, uniqueServed, blocked, byReason, byResult }
+  const quotaRows = await db.query(
+    `SELECT daily_quota FROM distribution_points WHERE code IN (${inClause(dps, 1).sql}) AND daily_quota IS NOT NULL`,
+    dps,
+  )
+  const dailyQuota = quotaRows.length ? quotaRows.reduce((sum, row) => sum + Number(row.daily_quota || 0), 0) : null
+  return {
+    scanDate, dpCodes: dps, uniqueServed, blocked, byReason, byResult,
+    dailyQuota,
+    quotaRemaining: dailyQuota == null ? null : Math.max(0, dailyQuota - uniqueServed),
+    quotaAchievement: dailyQuota ? uniqueServed / dailyQuota : null,
+  }
+}
+
+function daysBetween(from: string, to: string): number {
+  const a = Date.parse(`${from}T00:00:00Z`)
+  const b = Date.parse(`${to}T00:00:00Z`)
+  return Math.max(1, Math.round((b - a) / 86400000) + 1)
+}
+
+/** MealFlow-style daily follow-up: quota vs dispensed per distribution point. */
+export async function followUp(
+  db: Database,
+  actor: Actor,
+  filters: { from: string; to: string; dp?: string; district?: string },
+) {
+  let dps = filters.dp ? [filters.dp.toUpperCase()] : await accessibleDpCodes(db, actor)
+  for (const code of dps) assertDpAccess(actor, code)
+  const days = daysBetween(filters.from, filters.to)
+  const empty = { from: filters.from, to: filters.to, days, rows: [], totals: { quota: 0, served: 0, remaining: 0, achievement: null, needsAttention: 0, households: 0, blocked: 0, prepared: 0, withQuota: 0 } }
+  if (dps.length === 0) return empty
+  const clause = inClause(dps, 1)
+  const points = await db.query(
+    `SELECT code, name_en, name_ar, district, daily_quota, active FROM distribution_points
+     WHERE code IN (${clause.sql})${filters.district ? ` AND district = $${dps.length + 1}` : ''} ORDER BY code`,
+    filters.district ? [...dps, filters.district] : dps,
+  )
+  if (points.length === 0) return empty
+  const codes = points.map((p) => String(p.code))
+  const c2 = inClause(codes, 3)
+  const scans = await db.query(
+    `SELECT dp_code,
+            COUNT(*) FILTER (WHERE counts_as_distributed)::int AS served,
+            COUNT(DISTINCT hh_code) FILTER (WHERE counts_as_distributed)::int AS households,
+            COUNT(*) FILTER (WHERE NOT counts_as_distributed)::int AS blocked,
+            MAX(scanned_at) FILTER (WHERE counts_as_distributed) AS last_served
+     FROM meal_scans WHERE scan_date BETWEEN $1 AND $2 AND dp_code IN (${c2.sql}) GROUP BY dp_code`,
+    [filters.from, filters.to, ...codes],
+  )
+  const prod = await db.query(
+    `SELECT dp_code, SUM(meals_prepared)::int AS prepared FROM daily_production
+     WHERE production_date BETWEEN $1 AND $2 AND dp_code IN (${c2.sql}) GROUP BY dp_code`,
+    [filters.from, filters.to, ...codes],
+  )
+  const byDp = new Map(scans.map((r) => [String(r.dp_code), r]))
+  const prepBy = new Map(prod.map((r) => [String(r.dp_code), Number(r.prepared) || 0]))
+  const rows = points.map((p) => {
+    const code = String(p.code)
+    const s = byDp.get(code)
+    const served = s ? Number(s.served) || 0 : 0
+    const daily = p.daily_quota == null ? null : Number(p.daily_quota)
+    const quota = daily == null ? null : daily * days
+    const remaining = quota == null ? null : Math.max(0, quota - served)
+    const achievement = quota ? served / quota : null
+    const status = quota == null || quota === 0 ? 'no_quota' : served >= quota ? 'met' : 'under'
+    return {
+      dpCode: code,
+      nameEn: String(p.name_en),
+      nameAr: String(p.name_ar),
+      district: String(p.district),
+      active: asBool(p.active),
+      dailyQuota: daily,
+      quota,
+      served,
+      remaining,
+      achievement,
+      status,
+      households: s ? Number(s.households) || 0 : 0,
+      blocked: s ? Number(s.blocked) || 0 : 0,
+      prepared: prepBy.has(code) ? prepBy.get(code)! : null,
+      lastServedAt: s?.last_served == null ? null : asText(s.last_served),
+    }
+  })
+  const withQuota = rows.filter((r) => r.quota != null && r.quota > 0)
+  const quota = withQuota.reduce((sum, r) => sum + (r.quota ?? 0), 0)
+  const servedQ = withQuota.reduce((sum, r) => sum + r.served, 0)
+  return {
+    from: filters.from,
+    to: filters.to,
+    days,
+    rows,
+    totals: {
+      quota,
+      served: rows.reduce((sum, r) => sum + r.served, 0),
+      remaining: withQuota.reduce((sum, r) => sum + (r.remaining ?? 0), 0),
+      achievement: quota ? servedQ / quota : null,
+      needsAttention: rows.filter((r) => r.status === 'under').length,
+      households: rows.reduce((sum, r) => sum + r.households, 0),
+      blocked: rows.reduce((sum, r) => sum + r.blocked, 0),
+      prepared: rows.reduce((sum, r) => sum + (r.prepared ?? 0), 0),
+      withQuota: withQuota.length,
+    },
+  }
 }
 
 function requireWriter(actor: Actor): void {
@@ -1411,7 +1512,7 @@ export async function exportRegister(db: Database, actor: Actor, scanDate: strin
 export async function listDps(db: Database) {
   const rows = await db.query(
     `SELECT d.code, d.name_en, d.name_ar, d.district, d.active,
-            d.latitude, d.longitude, d.gps_radius_m, d.gps_check_active,
+            d.latitude, d.longitude, d.gps_radius_m, d.gps_check_active, d.daily_quota,
             COALESCE((SELECT COUNT(*)::int FROM households h WHERE h.dp_code = d.code AND h.status = 'active'), 0) AS household_count
      FROM distribution_points d
      ORDER BY d.code`,
@@ -1434,6 +1535,7 @@ export async function listDps(db: Database) {
       longitude: row.longitude == null ? null : Number(row.longitude),
       gpsRadiusM: Number(row.gps_radius_m) || 150,
       gpsCheckActive: asBool(row.gps_check_active),
+      dailyQuota: row.daily_quota == null ? null : Number(row.daily_quota),
       householdCount: Number(row.household_count) || 0,
       assignedUsers: links
         .filter((link) => String(link.dp_code) === code)
@@ -1565,6 +1667,7 @@ export async function patchDp(
     longitude?: number | null
     gpsRadiusM?: number | null
     gpsCheckActive?: boolean | null
+    dailyQuota?: number | null
   },
   actor?: Actor | null,
 ) {
@@ -1595,6 +1698,9 @@ export async function patchDp(
      WHERE code = $1`,
     [currentCode, nameEn, nameAr, district, active, gps.latitude, gps.longitude, gps.gpsRadiusM, gps.gpsCheckActive],
   )
+  if (input.dailyQuota !== undefined) {
+    await db.query(`UPDATE distribution_points SET daily_quota = $2 WHERE code = $1`, [currentCode, input.dailyQuota])
+  }
   if (input.userIds) await replaceDpAssignments(db, currentCode, input.userIds)
   const listed = await listDps(db)
   const row = listed.find((item) => item.code === currentCode)
@@ -1615,6 +1721,7 @@ export async function patchDp(
         gpsRadiusM: gps.gpsRadiusM,
         gpsCheckActive: gps.gpsCheckActive,
         userIds: input.userIds ?? null,
+        dailyQuota: input.dailyQuota,
         renamedFrom: code.trim().toUpperCase() !== currentCode ? code : null,
       },
     })

@@ -10,9 +10,9 @@ import { Icon, RoleBadge, type IconName } from '../components/ui'
 
 const LINKS: Record<Role, CopyKey[]> = {
   dp_focal: ['scan', 'manual', 'dashboard', 'sop'],
-  meal: ['dashboard', 'reports', 'register', 'reconcile', 'cards', 'export', 'sop'],
-  supervisor: ['scan', 'manual', 'dashboard', 'reports', 'reconcile', 'export', 'sop'],
-  admin: ['dashboard', 'reports', 'reconcile', 'admin', 'register', 'cards', 'export', 'sop'],
+  meal: ['dashboard', 'followup', 'reports', 'register', 'reconcile', 'cards', 'export', 'sop'],
+  supervisor: ['scan', 'manual', 'dashboard', 'followup', 'reports', 'reconcile', 'export', 'sop'],
+  admin: ['dashboard', 'followup', 'reports', 'reconcile', 'admin', 'register', 'cards', 'export', 'sop'],
 }
 
 const ROLE_LABEL: Record<Role, CopyKey> = {
@@ -27,6 +27,7 @@ const PATH: Partial<Record<CopyKey, string>> = {
   manual: '/manual',
   dashboard: '/dashboard',
   reports: '/reports',
+  followup: '/followup',
   register: '/register',
   cards: '/cards',
   reconcile: '/reconcile',
@@ -40,6 +41,7 @@ const DESC: Partial<Record<CopyKey, CopyKey>> = {
   manual: 'tileManual',
   dashboard: 'tileDashboard',
   reports: 'tileReports',
+  followup: 'tileFollowup',
   register: 'tileRegister',
   cards: 'tileCards',
   reconcile: 'tileReconcile',
@@ -111,6 +113,7 @@ export function HomePage() {
     manual: 'manual',
     dashboard: 'dashboard',
     reports: 'reconcile',
+    followup: 'dashboard',
     register: 'register',
     cards: 'cards',
     reconcile: 'reconcile',
