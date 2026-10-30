@@ -91,7 +91,9 @@ export function QrCard(props: EntitlementCardProps) {
   const holder = props.holderName?.trim() || '—'
   const count =
     props.beneficiaryCount != null && props.beneficiaryCount > 0 ? String(props.beneficiaryCount) : '—'
-  const district = (props.dpNameAr || props.dpNameEn || props.dpCode || '—').trim() || '—'
+  const dpUpper = (props.dpCode || '').toUpperCase()
+  const district = dpUpper.startsWith('QAH') ? 'القاهرة' : dpUpper.startsWith('MDF') ? 'المظفر' : '—'
+  const dpName = (props.dpNameAr || props.dpNameEn || props.dpCode || '—').trim() || '—'
   const complaints = props.complaintsHeadingAr?.trim() || 'الشكاوى والمقترحات'
   const hotlineHeading = props.hotlineHeadingAr?.trim() || 'الخط الساخن'
   const reassurance =
@@ -103,8 +105,10 @@ export function QrCard(props: EntitlementCardProps) {
   const showBatch = props.showBatch !== false
   const serial = props.cardSerial?.trim() || ''
   const batch = props.printBatch?.trim() || ''
-  const phone = (props.hdpPhone || props.partnerPhone || '').trim()
-  const whatsapp = (props.hdpWhatsapp || props.partnerWhatsapp || '').trim()
+  const hdpPhone = (props.hdpPhone || '').trim()
+  const hdpWa = (props.hdpWhatsapp || '').trim()
+  const wfpPhone = (props.partnerPhone || '').trim()
+  const wfpWa = (props.partnerWhatsapp || '').trim()
 
   const front = (
     <article className="entitlement-face entitlement-front entitlement-card-mm" style={cardStyle}>
@@ -133,7 +137,11 @@ export function QrCard(props: EntitlementCardProps) {
           </div>
           <div className="ec-row">
             <span className="ec-label">المديرية</span>
-            <span className="ec-value">{district}</span>
+            <span className="ec-value" data-testid="card-district">{district}</span>
+          </div>
+          <div className="ec-row">
+            <span className="ec-label">نقطة التوزيع</span>
+            <span className="ec-value" data-testid="card-dp">{dpName}</span>
           </div>
           <div className="ec-dates">
             <div><span>تاريخ الإصدار</span> <b dir="ltr">{props.validFrom?.trim() || '—'}</b></div>
@@ -161,13 +169,15 @@ export function QrCard(props: EntitlementCardProps) {
         <span data-testid="card-hotline-heading">{hotlineHeading}</span>
       </header>
       <div className="ec-panels">
-        <div className="ec-panel">
-          <div className="ec-panel-title"><PhoneIcon /> {hotlineHeading}</div>
-          <div className="ec-panel-num" dir="ltr">{phone || '—'}</div>
+        <div className="ec-panel" data-testid="card-panel-hdp">
+          <div className="ec-panel-title">قنوات برنامج التنمية</div>
+          <div className="ec-panel-line"><PhoneIcon /> <span dir="ltr">{hdpPhone || '—'}</span></div>
+          <div className="ec-panel-line"><WhatsAppIcon /> <span dir="ltr">{hdpWa || '—'}</span></div>
         </div>
-        <div className="ec-panel">
-          <div className="ec-panel-title"><WhatsAppIcon /> واتساب</div>
-          <div className="ec-panel-num" dir="ltr">{whatsapp || '—'}</div>
+        <div className="ec-panel" data-testid="card-panel-wfp">
+          <div className="ec-panel-title">برنامج الغذاء العالمي</div>
+          <div className="ec-panel-line"><PhoneIcon /> <span dir="ltr">{wfpPhone || '—'}</span></div>
+          <div className="ec-panel-line"><WhatsAppIcon /> <span dir="ltr">{wfpWa || '—'}</span></div>
         </div>
       </div>
       <p className="ec-reassure">{reassurance}</p>

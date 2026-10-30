@@ -146,7 +146,7 @@ textarea {
 .ec-logo-hdp img { max-width: 16mm; max-height: 8mm; object-fit: contain; }
 .ec-logo-wfp img { max-width: 10mm; max-height: 10mm; object-fit: contain; }
 .ec-titles { text-align: center; }
-.ec-title { margin: 0; font-size: 2.75mm; font-weight: 700; color: var(--card-teal); line-height: 1.2; }
+.ec-title { margin: 0; font-size: 3.6mm; font-weight: 700; color: var(--card-teal); line-height: 1.2; }
 .ec-subtitle { margin: 0.4mm 0 0; font-size: 2.3mm; font-weight: 600; color: #334; }
 .ec-body {
   flex: 1;
@@ -162,7 +162,7 @@ textarea {
   align-items: baseline;
   gap: 1.5mm;
   border-bottom: 0.2mm solid #d7e0e2;
-  padding-bottom: 0.6mm;
+  padding-bottom: 0.4mm;
 }
 .ec-label { flex: none; width: 11mm; font-size: 2.2mm; color: var(--card-teal); font-weight: 700; }
 .ec-value { flex: 1; min-width: 0; font-size: 2.8mm; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -186,12 +186,13 @@ textarea {
   margin-top: 0.8mm;
 }
 .ec-dot { opacity: 0.7; }
-.ec-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5mm; margin-top: 2.6mm; }
-.ec-panel { border: 0.3mm solid var(--card-teal); border-radius: 1.8mm; padding: 1.8mm 1.5mm; text-align: center; }
+.ec-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm; margin-top: 1.8mm; }
+.ec-panel-line { display: flex; justify-content: center; align-items: center; gap: 1mm; margin-top: 0.6mm; font-size: 2.7mm; font-weight: 700; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.ec-panel { border: 0.3mm solid var(--card-teal); border-radius: 1.8mm; padding: 1.2mm 1mm; text-align: center; }
 .ec-panel-title { display: flex; justify-content: center; align-items: center; gap: 1mm; font-size: 2.4mm; font-weight: 700; color: var(--card-teal); }
 .ec-panel-num { margin-top: 0.8mm; font-size: 3.5mm; font-weight: 700; font-family: ui-monospace, Menlo, Consolas, monospace; }
 .card-icon { width: 3mm; height: 3mm; flex: none; }
-.ec-reassure { margin: 3mm 0 0; font-size: 2.45mm; font-weight: 700; text-align: center; color: #0b1f2a; }
+.ec-reassure { margin: 2mm 0 0; min-height: 9mm; display: flex; align-items: center; justify-content: center; padding: 1mm 1.5mm; border: 0.25mm dashed var(--card-teal); border-radius: 1.5mm; line-height: 1.35; font-size: 2.45mm; font-weight: 700; text-align: center; color: #0b1f2a; }
 .ec-notice { margin: 1.2mm 0 0; font-size: 2.15mm; text-align: center; color: #445; }
 .ec-meta { margin-top: auto; display: flex; justify-content: space-between; gap: 2mm; font-size: 1.85mm; color: #667; font-family: ui-monospace, Menlo, Consolas, monospace; }
 
