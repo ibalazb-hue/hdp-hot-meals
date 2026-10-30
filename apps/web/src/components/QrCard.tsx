@@ -124,11 +124,11 @@ export function QrCard(props: EntitlementCardProps) {
       <div className="ec-body">
         <div className="ec-fields">
           <div className="ec-row">
-            <span className="ec-label">الاسم</span>
+            <span className="ec-label">اسم الأسرة</span>
             <span className="ec-value" data-testid="card-family">{holder}</span>
           </div>
           <div className="ec-row">
-            <span className="ec-label">العدد</span>
+            <span className="ec-label">عدد الأفراد</span>
             <span className="ec-value" data-testid="card-members">{count}</span>
           </div>
           <div className="ec-row">

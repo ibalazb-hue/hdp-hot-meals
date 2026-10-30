@@ -2205,9 +2205,12 @@ export async function reports(db: Database, actor: Actor, filters: ReportFilters
 function totalFromProfile(profile: Array<{ key: string; value: unknown }>, fallback: number): number {
   const m = profile.find((p) => p.key === 'males')?.value
   const f = profile.find((p) => p.key === 'females')?.value
-  if (typeof m === 'number' && typeof f === 'number' && m + f >= 1) {
-    if (m + f > 30) throw new HttpError(400, 'invalid_count')
-    return m + f
+  const hasM = typeof m === 'number'
+  const hasF = typeof f === 'number'
+  const sum = (hasM ? (m as number) : 0) + (hasF ? (f as number) : 0)
+  if ((hasM || hasF) && sum >= 1) {
+    if (sum > 30) throw new HttpError(400, 'invalid_count')
+    return sum
   }
   return fallback
 }

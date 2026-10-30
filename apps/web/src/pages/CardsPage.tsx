@@ -136,6 +136,12 @@ export function CardsPage() {
     setBulkActive(false)
   }
 
+  const editAutoTotal =
+    editProfile.males != null || editProfile.females != null ? (editProfile.males ?? 0) + (editProfile.females ?? 0) : null
+  useEffect(() => {
+    if (editAutoTotal != null && editAutoTotal > 0) setEditCount(String(editAutoTotal))
+  }, [editAutoTotal])
+
   async function saveDetails() {
     if (!selected) return
     const count = Number(editCount)
@@ -317,6 +323,7 @@ export function CardsPage() {
                 dir="ltr"
                 inputMode="numeric"
                 value={editCount}
+                disabled={editAutoTotal != null && editAutoTotal > 0}
                 onChange={(event) => setEditCount(event.target.value.replace(/[^\d]/g, '').slice(0, 2))}
               />
             </Field>
